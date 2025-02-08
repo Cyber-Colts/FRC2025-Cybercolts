@@ -125,10 +125,17 @@ public class Robot extends TimedRobot {
     double forward = -joystick.getRightY();
     double rotation = joystick.getLeftX();
     
+    // Define a multiplier
+    double multiplier = 0.5; // Adjust this value as needed
+    
+    // Apply the multiplier to the joystick inputs
+    rotation *= multiplier;
+    forward *= multiplier;
+    
     if (joystick.getRawButtonPressed(8)) {
       launcher.set(10); // When pressed the intake turns counter-clockwise
     }
-     if (joystick.getRawButtonPressed(6)) {
+    if (joystick.getRawButtonPressed(6)) {
       launcher.set(-10); // When pressed the intake turns clockwise
     }
     if (joystick.getRawButtonReleased(8)) {
@@ -137,7 +144,7 @@ public class Robot extends TimedRobot {
     if (joystick.getRawButtonReleased(6)) {
       launcher.set(0); // When pressed the intake turns off
     }
-
+    
     /*
      * Apply values to left and right side. We will only need to set the leaders
      * since the other motors are in follower mode.
@@ -145,7 +152,7 @@ public class Robot extends TimedRobot {
     leftLeader.set(forward - rotation);
     rightLeader.set(forward + rotation);
   }
-
+    
   @Override
   public void disabledInit() {
   }
