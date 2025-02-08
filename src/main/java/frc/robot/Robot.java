@@ -12,8 +12,13 @@ import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.spark.config.SparkMaxConfig;
 
 import edu.wpi.first.cameraserver.CameraServer;
+import edu.wpi.first.cscore.UsbCamera;
+import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj.PS4Controller;
+//import edu.wpi.first.wpilibj.PowerDistribution;
+//import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 //import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 
@@ -24,10 +29,20 @@ public class Robot extends TimedRobot {
   SparkMax rightFollower;
   SparkMax launcher;
   PS4Controller joystick;
+  DutyCycleEncoder m_encoder = new DutyCycleEncoder(0);
+  DifferentialDrive drive = new DifferentialDrive(leftLeader, rightLeader);
+  //PowerDistribution PDP = new PowerDistribution(0, ModuleType.kRev);
+  
+
 
   public Robot() {
-    CameraServer.startAutomaticCapture();
+    UsbCamera camera = CameraServer.startAutomaticCapture();
+    
+    camera.setResolution(1280, 720);
+
+    
     // Initialize the SPARKs
+
     leftLeader = new SparkMax(2, MotorType.kBrushed);
     leftFollower = new SparkMax(4, MotorType.kBrushed);
     rightLeader = new SparkMax(1, MotorType.kBrushed);
@@ -45,7 +60,7 @@ public class Robot extends TimedRobot {
     SparkMaxConfig rightLeaderConfig = new SparkMaxConfig();
     SparkMaxConfig leftFollowerConfig = new SparkMaxConfig();
     SparkMaxConfig rightFollowerConfig = new SparkMaxConfig();
-    SparkMaxConfig launcherConfig = new SparkMaxConfig();
+    //SparkMaxConfig launcherConfig = new SparkMaxConfig();
     
     /*
      * Set parameters that will apply to all SPARKs. We will also use this as
@@ -92,18 +107,23 @@ public class Robot extends TimedRobot {
     leftFollower.configure(leftFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     rightLeader.configure(rightLeaderConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     rightFollower.configure(rightFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
-
     // Initialize joystick
     joystick = new PS4Controller(0);
   }
-
+  
   @Override
   public void robotPeriodic() {
     // Display the applied output of the left and right side onto the dashboard
     SmartDashboard.putNumber("Left Out", leftLeader.getAppliedOutput());
     SmartDashboard.putNumber("Right Out", rightLeader.getAppliedOutput());
+    SmartDashboard.putData("Encoder", m_encoder);
+    SmartDashboard.putBoolean("Teleop Is On", isTeleopEnabled());
+    SmartDashboard.putData("Diff", drive);
+    //double voltage = PDP.getVoltage();
+    //SmartDashboard.putNumber("Voltage", voltage);
+    //SmartDashboard.putData("PDP",PDP);
   }
-
+  
   @Override
   public void autonomousInit() {
   }
