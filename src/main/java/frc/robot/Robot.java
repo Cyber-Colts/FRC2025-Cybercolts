@@ -15,10 +15,9 @@ import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.cscore.UsbCamera;
 import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj.PS4Controller;
-//import edu.wpi.first.wpilibj.PowerDistribution;
-//import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 //import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 
@@ -60,7 +59,7 @@ public class Robot extends TimedRobot {
     SparkMaxConfig rightLeaderConfig = new SparkMaxConfig();
     SparkMaxConfig leftFollowerConfig = new SparkMaxConfig();
     SparkMaxConfig rightFollowerConfig = new SparkMaxConfig();
-    //SparkMaxConfig launcherConfig = new SparkMaxConfig();
+    SparkMaxConfig launcherConfig = new SparkMaxConfig();
     
     /*
      * Set parameters that will apply to all SPARKs. We will also use this as
@@ -113,12 +112,19 @@ public class Robot extends TimedRobot {
   
   @Override
   public void robotPeriodic() {
+    Field2d m_field = new Field2d();
     // Display the applied output of the left and right side onto the dashboard
+    SmartDashboard.putData("Field", m_field);
     SmartDashboard.putNumber("Left Out", leftLeader.getAppliedOutput());
     SmartDashboard.putNumber("Right Out", rightLeader.getAppliedOutput());
     SmartDashboard.putData("Encoder", m_encoder);
     SmartDashboard.putBoolean("Teleop Is On", isTeleopEnabled());
     SmartDashboard.putData("Diff", drive);
+    //m_field.setRobotPose(m_odometry.getPoseMeters());
+    //DifferentialDriveOdometry m_odometry = new DifferentialDriveOdometry(
+    //  m_gyro.getRotation2d(),
+    //  m_encoder.get(), m_encoder.get(),
+    //  new Pose2d(5.0, 13.5, new Rotation2d()));
     //double voltage = PDP.getVoltage();
     //SmartDashboard.putNumber("Voltage", voltage);
     //SmartDashboard.putData("PDP",PDP);
@@ -146,7 +152,7 @@ public class Robot extends TimedRobot {
     double rotation = joystick.getLeftX();
     
     // Define a multiplier
-    double multiplier = 0.5; // Adjust this value as needed
+    double multiplier = 1.0; // Adjust this value as needed
     
     // Apply the multiplier to the joystick inputs
     rotation *= multiplier;
