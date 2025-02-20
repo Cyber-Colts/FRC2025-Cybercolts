@@ -10,34 +10,40 @@ import com.ctre.phoenix6.controls.DutyCycleOut;
 import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
+import com.ctre.phoenix6.signals.NeutralModeValue;
+import com.revrobotics.spark.SparkBase.PersistMode;
+import com.revrobotics.spark.SparkBase.ResetMode;
+import com.revrobotics.spark.SparkLowLevel.MotorType;
+import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
+import com.revrobotics.spark.config.SparkMaxConfig;
 import com.studica.frc.AHRS;
 import com.studica.frc.AHRS.NavXComType;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
-import edu.wpi.first.wpilibj.PS4Controller;
+import edu.wpi.first.wpilibj.GenericHID;
+import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
-
-//import edu.wpi.first.wpilibj2.command.button.JoystickButton;
-
 public class Robot extends TimedRobot {
-  private final CANBus kCANBus = new CANBus("canivore");
+  private final CANBus kCANBus = new CANBus();
 
   private final TalonFX leftLeader = new TalonFX(1, kCANBus);
   private final TalonFX leftFollower = new TalonFX(2, kCANBus);
   private final TalonFX rightLeader = new TalonFX(3, kCANBus);
   private final TalonFX rightFollower = new TalonFX(4, kCANBus);
-
+  
   private final DutyCycleOut leftOut = new DutyCycleOut(0);
   private final DutyCycleOut rightOut = new DutyCycleOut(0);
+  SparkMax launcher;
 
-  PS4Controller joystick;
+  GenericHID joystick;
   
   AHRS m_gyro = new AHRS(NavXComType.kMXP_SPI);
   
@@ -53,24 +59,30 @@ public class Robot extends TimedRobot {
   public Robot() {
     var leftConfiguration = new TalonFXConfiguration();
     var rightConfiguration = new TalonFXConfiguration();
+    launcher = new SparkMax(5, MotorType.kBrushless);
+    SparkMaxConfig launcherConfig = new SparkMaxConfig();
+
 
     /* User can optionally change the configs or leave it alone to perform a factory default */
     leftConfiguration.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+    leftConfiguration.MotorOutput.NeutralMode = NeutralModeValue.Brake;
+    rightConfiguration.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     rightConfiguration.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
-
+    
+    launcherConfig
+        .smartCurrentLimit(80)
+        .idleMode(IdleMode.kCoast);
+    launcher.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    
     leftLeader.getConfigurator().apply(leftConfiguration);
     leftFollower.getConfigurator().apply(leftConfiguration);
     rightLeader.getConfigurator().apply(rightConfiguration);
     rightFollower.getConfigurator().apply(rightConfiguration);
 
-    /* Set up followers to follow leaders */
-    leftFollower.setControl(new Follower(leftLeader.getDeviceID(), false));
-    rightFollower.setControl(new Follower(rightLeader.getDeviceID(), false));
-  
     leftLeader.setSafetyEnabled(true);
     rightLeader.setSafetyEnabled(true);
     // Initialize joystick
-    joystick = new PS4Controller(0);
+    joystick = new Joystick(0);
   }
 
   @Override
@@ -109,18 +121,42 @@ public class Robot extends TimedRobot {
      * Get forward and rotation values from the joystick. Invert the joystick's
      * Y value because its forward direction is negative.
      */
-    double forward = -joystick.getRightY();
-    double rotation = joystick.getLeftX();
-    
-    // Define a multiplier
-    double multiplier = 0.6; // Adjust this value as needed
-    
-    // Apply the multiplier to the joystick inputs
-    rotation *= multiplier;
-    forward *= multiplier;
+    /* Get forward and rotational throttle from joystick */
+    /* invert the joystick Y because forward Y is negative */
+    double fwd = -joystick.getRawAxis(1);
+    double rot = joystick.getRawAxis(4);
+    if(fwd != 0){
+    /* Set up followers to follow leaders */
+    leftFollower.setControl(new Follower(leftLeader.getDeviceID(), true));
+    rightFollower.setControl(new Follower(rightLeader.getDeviceID(), true));
+    }
+    if(rot != 0){
+    /* Set up followers to follow leaders */
+    leftFollower.setControl(new Follower(leftLeader.getDeviceID(), false));
+    rightFollower.setControl(new Follower(rightLeader.getDeviceID(), false));    
+    }
 
-    leftOut.Output = forward + rotation;
-    rightOut.Output = forward - rotation;
+    if (joystick.getRawButtonPressed(5)) {
+      launcher.set(10); // When pressed the intake turns counter-clockwise
+    }
+    if (joystick.getRawButtonPressed(6)) {
+      launcher.set(-10); // When pressed the intake turns clockwise
+    }
+    if (joystick.getRawButtonReleased(5)) {
+      launcher.set(0); // When pressed the intake turns off
+    }
+    if (joystick.getRawButtonReleased(6)) {
+      launcher.set(0); // When pressed the intake turns off
+    }
+
+    /* Set output to control frames */
+    leftOut.Output = fwd + rot;
+    rightOut.Output = fwd - rot;
+    /* And set them to the motors */
+    if (!joystick.getRawButton(1)) {
+      leftLeader.setControl(leftOut);
+      rightLeader.setControl(rightOut);
+    }
   }
     
   @Override
