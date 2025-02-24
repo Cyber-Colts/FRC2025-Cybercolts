@@ -7,7 +7,6 @@ package frc.robot;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.DutyCycleOut;
-import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
@@ -25,6 +24,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.PS4Controller;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
 import edu.wpi.first.wpilibj.TimedRobot;
@@ -44,6 +44,7 @@ public class Robot extends TimedRobot {
   SparkMax launcher;
 
   GenericHID joystick;
+  PS4Controller joystick1;
   
   AHRS m_gyro = new AHRS(NavXComType.kMXP_SPI);
   
@@ -83,6 +84,7 @@ public class Robot extends TimedRobot {
     rightLeader.setSafetyEnabled(true);
     // Initialize joystick
     joystick = new Joystick(0);
+    joystick1 = new PS4Controller(1);
   }
 
   @Override
@@ -123,37 +125,40 @@ public class Robot extends TimedRobot {
      */
     /* Get forward and rotational throttle from joystick */
     /* invert the joystick Y because forward Y is negative */
-    double fwd = -joystick.getRawAxis(1);
-    double rot = joystick.getRawAxis(4);
-    if(fwd != 0){
+    double fwd = -joystick1.getRawAxis(1);
+    double rot = joystick1.getRawAxis(2);
+    //if(fwd != 0){
     /* Set up followers to follow leaders */
-    leftFollower.setControl(new Follower(leftLeader.getDeviceID(), true));
-    rightFollower.setControl(new Follower(rightLeader.getDeviceID(), true));
+    //leftFollower.setControl(new Follower(leftLeader.getDeviceID(), true));
+    //rightFollower.setControl(new Follower(rightLeader.getDeviceID(), true));
+    //}
+    //if(rot != 0){
+    /* Set up followers to follow leaders */
+    //leftFollower.setControl(new Follower(leftLeader.getDeviceID(), false));
+    //rightFollower.setControl(new Follower(rightLeader.getDeviceID(), false));    
+    //}
+
+    if(joystick.getRawButton(5)){
+      launcher.set(-20);
     }
-    if(rot != 0){
-    /* Set up followers to follow leaders */
-    leftFollower.setControl(new Follower(leftLeader.getDeviceID(), false));
-    rightFollower.setControl(new Follower(rightLeader.getDeviceID(), false));    
+    if(!joystick.getRawButton(5)){
+      launcher.set(0);
+    }
+    if(joystick.getRawButton(6)){
+      launcher.set(20);
+    }
+    if(!joystick.getRawButton(6)){
+      launcher.set(0
+      
+      );
     }
 
-    if (joystick.getRawButtonPressed(5)) {
-      launcher.set(10); // When pressed the intake turns counter-clockwise
-    }
-    if (joystick.getRawButtonPressed(6)) {
-      launcher.set(-10); // When pressed the intake turns clockwise
-    }
-    if (joystick.getRawButtonReleased(5)) {
-      launcher.set(0); // When pressed the intake turns off
-    }
-    if (joystick.getRawButtonReleased(6)) {
-      launcher.set(0); // When pressed the intake turns off
-    }
 
     /* Set output to control frames */
     leftOut.Output = fwd + rot;
     rightOut.Output = fwd - rot;
     /* And set them to the motors */
-    if (!joystick.getRawButton(1)) {
+    if (!joystick1.getRawButton(1)) {
       leftLeader.setControl(leftOut);
       rightLeader.setControl(rightOut);
     }
