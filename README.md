@@ -1,19 +1,13 @@
-# Open Loop Arcade Drive Example
+# CyberColts
 
 ## Description
 
-This example shows how to create a simple arcade drive with SPARK MAX motor controllers.
+This is the production code used for "Bojack", the main robot of FRC team 10211
 
-### Topics Covered
+### Features
 
-* Configuring a SPARK motor controller
-* Using follower mode
-* Retrieving motor data
+* Kraken x60 implementation
+* Dual Joystick Teleop
+* SparkMax Control w/ NEO internal encoder reader
+* SmartDashboard configuration for elastic
 
-## Usage
-
-This example assumes a simple west coast drivetrain composed of four SPARK MAX controllers with NEO motors.
-
-<!-- For information on migrating to SPARK Flex, see our [documentation](). -->
-
-Deploy the program to your roboRIO and connect a joystick to your computer to drive the robot. The applied outputs of the left and right side of the drivetrain will be displayed onto SmartDashboard.

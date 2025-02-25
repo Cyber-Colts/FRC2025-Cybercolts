@@ -41,7 +41,18 @@ public class Robot extends TimedRobot {
   
   private final DutyCycleOut leftOut = new DutyCycleOut(0);
   private final DutyCycleOut rightOut = new DutyCycleOut(0);
-  SparkMax launcher;
+  SparkMax turntable;
+  SparkMax armPitch;
+  SparkMax armPitch2;
+  SparkMax armExt;
+  SparkMax hand;
+  
+  double encoderRaw;
+  double encoderRawL;
+  double encoderRawR;
+  double wheelPosL;
+  double wheelPosR;
+
 
   GenericHID joystick;
   PS4Controller joystick1;
@@ -60,7 +71,11 @@ public class Robot extends TimedRobot {
   public Robot() {
     var leftConfiguration = new TalonFXConfiguration();
     var rightConfiguration = new TalonFXConfiguration();
-    launcher = new SparkMax(5, MotorType.kBrushless);
+    turntable = new SparkMax(5, MotorType.kBrushless);
+    armPitch = new SparkMax(6, MotorType.kBrushless);
+    armPitch2 = new SparkMax(7, MotorType.kBrushless);
+
+
     SparkMaxConfig launcherConfig = new SparkMaxConfig();
 
 
@@ -72,9 +87,12 @@ public class Robot extends TimedRobot {
     
     launcherConfig
         .smartCurrentLimit(80)
-        .idleMode(IdleMode.kCoast);
-    launcher.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
-    
+        .idleMode(IdleMode.kBrake);
+
+    turntable.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    armPitch.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    armPitch2.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+
     leftLeader.getConfigurator().apply(leftConfiguration);
     leftFollower.getConfigurator().apply(leftConfiguration);
     rightLeader.getConfigurator().apply(rightConfiguration);
@@ -95,6 +113,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putData("Gyro", m_gyro);
     SmartDashboard.putNumber("Right Encoder", getEncoderRight());
     SmartDashboard.putNumber("Left Encoder", getEncoderLeft());
+    SmartDashboard.putNumber("Turntable Encoder", getEncoderTurntable());
     SmartDashboard.putNumber("Speed", m_gyro.getRobotCentricVelocityX());
     SmartDashboard.putNumber("Pitch", m_gyro.getPitch());
     DifferentialDriveOdometry m_odometry = new DifferentialDriveOdometry(
@@ -139,18 +158,28 @@ public class Robot extends TimedRobot {
     //}
 
     if(joystick.getRawButton(5)){
-      launcher.set(-20);
+      //set limit for turntable
+      if(360 / 4 * turntable.getAbsoluteEncoder().getPosition() > -360) {
+        turntable.set(-20);
+      }
+      else {
+        turntable.set(0);
+      }
     }
     if(!joystick.getRawButton(5)){
-      launcher.set(0);
+      turntable.set(0);
     }
     if(joystick.getRawButton(6)){
-      launcher.set(20);
+      //set limit for turntable
+      if(360 / 4 * turntable.getAbsoluteEncoder().getPosition() > 360) {
+        turntable.set(20);
+      }
+      else {
+        turntable.set(0);
+      }
     }
     if(!joystick.getRawButton(6)){
-      launcher.set(0
-      
-      );
+      turntable.set(0);
     }
 
 
@@ -194,10 +223,20 @@ public class Robot extends TimedRobot {
   }
 
   public double getEncoderLeft() {
-    return leftLeader.getPosition().getValueAsDouble();
+    /*apply the multiplication of the gearbox ratio of 7.31:1 to the encoder value
+    taking into account pi*6 inch wheel diameter (0.1524 meters)*/
+    encoderRawL = leftLeader.getPosition().getValueAsDouble();
+    wheelPosL = Math.PI * 0.1524 / encoderRawL * 7.31;
+    return wheelPosL;
   }
 
   public double getEncoderRight() {
-    return rightLeader.getPosition().getValueAsDouble();
+    encoderRawR = rightLeader.getPosition().getValueAsDouble();
+    wheelPosR = Math.PI * 0.1524 / encoderRawR* 7.31;
+    return wheelPosR;
+  }
+  public double getEncoderTurntable() {
+    encoderRaw = turntable.getAbsoluteEncoder().getPosition();
+  return encoderRaw * 4;
   }
 }
