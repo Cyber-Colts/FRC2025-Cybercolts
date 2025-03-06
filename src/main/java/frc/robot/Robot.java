@@ -45,7 +45,8 @@ public class Robot extends TimedRobot {
   SparkMax armPitch;
   SparkMax armPitch2;
   SparkMax armExt;
-  SparkMax hand;
+  SparkMax Rollers;
+  SparkMax IntakeExt;
           
   double encoderRaw;
   double encoderRawL;
@@ -114,6 +115,11 @@ public class Robot extends TimedRobot {
 
   @Override
   public void robotPeriodic() {
+    //Update Pose on field
+    m_odometry.update(m_gyro.getRotation2d(),
+      getEncoderLeft(),
+      getEncoderRight());
+    m_field.setRobotPose(m_odometry.getPoseMeters());
     // Display the applied output of the left and right side onto the dashboard
     SmartDashboard.putData("Field", m_field);
     SmartDashboard.putBoolean("Teleop Is On", isTeleopEnabled());
@@ -123,12 +129,6 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Turntable Encoder", getEncoderTurntable());
     SmartDashboard.putNumber("Speed", m_gyro.getRobotCentricVelocityX());
     SmartDashboard.putNumber("Pitch", m_gyro.getPitch());
-    var gyroAngle = m_gyro.getRotation2d();
-    // Update the pose
-    m_odometry.update(gyroAngle,
-      getEncoderLeft(),
-      getEncoderRight());
-    m_field.setRobotPose(m_odometry.getPoseMeters());
     SmartDashboard.putData("PDP",PDP);
   }
 
