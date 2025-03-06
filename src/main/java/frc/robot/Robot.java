@@ -56,6 +56,7 @@ public class Robot extends TimedRobot {
         
   PS4Controller joystick;
   Joystick joystick1;
+  DifferentialDriveOdometry m_odometry;
   
   AHRS m_gyro = new AHRS(NavXComType.kMXP_SPI);
   
@@ -104,6 +105,11 @@ public class Robot extends TimedRobot {
     // Initialize joystick
     joystick = new PS4Controller(0);
     joystick1 = new Joystick(1);
+
+    m_odometry = new DifferentialDriveOdometry(
+      m_gyro.getRotation2d(),
+      getEncoderLeft(), getEncoderRight(),
+      new Pose2d(5.0, 13.5, new Rotation2d()));
   }
 
   @Override
@@ -117,10 +123,11 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Turntable Encoder", getEncoderTurntable());
     SmartDashboard.putNumber("Speed", m_gyro.getRobotCentricVelocityX());
     SmartDashboard.putNumber("Pitch", m_gyro.getPitch());
-    DifferentialDriveOdometry m_odometry = new DifferentialDriveOdometry(
-      m_gyro.getRotation2d(),
-      getEncoderLeft(), getEncoderRight(),
-      new Pose2d(5.0, 13.5, new Rotation2d()));
+    var gyroAngle = m_gyro.getRotation2d();
+    // Update the pose
+    m_odometry.update(gyroAngle,
+      getEncoderLeft(),
+      getEncoderRight());
     m_field.setRobotPose(m_odometry.getPoseMeters());
     SmartDashboard.putData("PDP",PDP);
   }
