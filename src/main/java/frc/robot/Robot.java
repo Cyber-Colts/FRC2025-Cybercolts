@@ -21,7 +21,10 @@ import com.studica.frc.AHRS.NavXComType;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.PS4Controller;
 import edu.wpi.first.wpilibj.PowerDistribution;
@@ -58,6 +61,18 @@ public class Robot extends TimedRobot {
   PS4Controller joystick;
   Joystick joystick1;
   DifferentialDriveOdometry m_odometry;
+  // Creating my kinematics object: track width of 27 inches
+  DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(0.58);
+  // Example chassis speeds: 2 meters per second linear velocity,
+  // 1 radian per second angular velocity.
+  ChassisSpeeds chassisSpeeds = new ChassisSpeeds(2.0, 0, 1.0);
+  // Convert to wheel speeds
+  DifferentialDriveWheelSpeeds wheelSpeeds;
+
+  // Left velocity
+  double leftVelocity = wheelSpeeds.leftMetersPerSecond;
+  // Right velocity
+  double rightVelocity = wheelSpeeds.rightMetersPerSecond;
   
   AHRS m_gyro = new AHRS(NavXComType.kMXP_SPI);
   
@@ -71,6 +86,7 @@ public class Robot extends TimedRobot {
 
 
   public Robot() {
+    
     var leftConfiguration = new TalonFXConfiguration();
     var rightConfiguration = new TalonFXConfiguration();
     turntable = new SparkMax(5, MotorType.kBrushless);
@@ -115,10 +131,12 @@ public class Robot extends TimedRobot {
 
   @Override
   public void robotPeriodic() {
+    var wheelSpeeds = kinematics.toWheelSpeeds(chassisSpeeds);
     //Update Pose on field
     m_odometry.update(m_gyro.getRotation2d(),
       getEncoderLeft(),
       getEncoderRight());
+     
     m_field.setRobotPose(m_odometry.getPoseMeters());
     // Display the applied output of the left and right side onto the dashboard
     SmartDashboard.putData("Field", m_field);
@@ -128,6 +146,8 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Left Encoder", getEncoderLeft());
     SmartDashboard.putNumber("Turntable Encoder", getEncoderTurntable());
     SmartDashboard.putNumber("Speed", m_gyro.getRobotCentricVelocityX());
+    SmartDashboard.putNumber("ODOMVelocityL", leftVelocity);
+    SmartDashboard.putNumber("ODOMVelocityR", rightVelocity);
     SmartDashboard.putNumber("Pitch", m_gyro.getPitch());
     SmartDashboard.putData("PDP",PDP);
   }
