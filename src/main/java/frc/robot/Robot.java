@@ -22,7 +22,6 @@ import com.studica.frc.AHRS.NavXComType;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
-import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.PS4Controller;
 import edu.wpi.first.wpilibj.PowerDistribution;
@@ -32,13 +31,14 @@ import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class Robot extends TimedRobot {
+        
   private final CANBus kCANBus = new CANBus();
-
+        
   private final TalonFX leftLeader = new TalonFX(1, kCANBus);
   private final TalonFX leftFollower = new TalonFX(2, kCANBus);
   private final TalonFX rightLeader = new TalonFX(3, kCANBus);
   private final TalonFX rightFollower = new TalonFX(4, kCANBus);
-  
+          
   private final DutyCycleOut leftOut = new DutyCycleOut(0);
   private final DutyCycleOut rightOut = new DutyCycleOut(0);
   SparkMax turntable;
@@ -46,16 +46,16 @@ public class Robot extends TimedRobot {
   SparkMax armPitch2;
   SparkMax armExt;
   SparkMax hand;
-  
+          
   double encoderRaw;
   double encoderRawL;
   double encoderRawR;
   double wheelPosL;
   double wheelPosR;
-
-
-  GenericHID joystick;
-  PS4Controller joystick1;
+        
+        
+  PS4Controller joystick;
+  Joystick joystick1;
   
   AHRS m_gyro = new AHRS(NavXComType.kMXP_SPI);
   
@@ -74,7 +74,7 @@ public class Robot extends TimedRobot {
     turntable = new SparkMax(5, MotorType.kBrushless);
     armPitch = new SparkMax(6, MotorType.kBrushless);
     armPitch2 = new SparkMax(7, MotorType.kBrushless);
-
+    armExt = new SparkMax(8, MotorType.kBrushless);
 
     SparkMaxConfig launcherConfig = new SparkMaxConfig();
 
@@ -92,6 +92,7 @@ public class Robot extends TimedRobot {
     turntable.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armPitch.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armPitch2.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    armExt.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
     leftLeader.getConfigurator().apply(leftConfiguration);
     leftFollower.getConfigurator().apply(leftConfiguration);
@@ -101,8 +102,8 @@ public class Robot extends TimedRobot {
     leftLeader.setSafetyEnabled(true);
     rightLeader.setSafetyEnabled(true);
     // Initialize joystick
-    joystick = new Joystick(0);
-    joystick1 = new PS4Controller(1);
+    joystick = new PS4Controller(0);
+    joystick1 = new Joystick(1);
   }
 
   @Override
@@ -144,52 +145,50 @@ public class Robot extends TimedRobot {
      */
     /* Get forward and rotational throttle from joystick */
     /* invert the joystick Y because forward Y is negative */
-    double fwd = -joystick1.getRawAxis(1);
-    double rot = joystick1.getRawAxis(2);
-    //if(fwd != 0){
-    /* Set up followers to follow leaders */
-    //leftFollower.setControl(new Follower(leftLeader.getDeviceID(), true));
-    //rightFollower.setControl(new Follower(rightLeader.getDeviceID(), true));
-    //}
-    //if(rot != 0){
-    /* Set up followers to follow leaders */
-    //leftFollower.setControl(new Follower(leftLeader.getDeviceID(), false));
-    //rightFollower.setControl(new Follower(rightLeader.getDeviceID(), false));    
-    //}
+    double fwd = -joystick.getRawAxis(1);
+    double rot = joystick.getRawAxis(2);
+    double multiplier = 0.6;
+    double multiplierNormal = 0.3;
+    double multiplierTable = 0.3; 
+    double multiplierSLOW = 0.1;
 
-    if(joystick.getRawButton(5)){
-      //set limit for turntable
-      if(360 / 4 * turntable.getAbsoluteEncoder().getPosition() > -360) {
-        turntable.set(-20);
-      }
-      else {
-        turntable.set(0);
-      }
+    // Apply the multiplier to the joystick inputs
+    if (joystick.getR1Button()) {
+      rot *= multiplier;
+      fwd *= multiplier;
     }
-    if(!joystick.getRawButton(5)){
-      turntable.set(0);
+    else{
+      rot *= multiplierNormal;
+      fwd *= multiplierNormal;
     }
-    if(joystick.getRawButton(6)){
-      //set limit for turntable
-      if(360 / 4 * turntable.getAbsoluteEncoder().getPosition() > 360) {
-        turntable.set(20);
-      }
-      else {
-        turntable.set(0);
-      }
+    double pitchturn = joystick1.getRawAxis(1);
+    double rotturn = -joystick1.getRawAxis(0);
+    pitchturn *= multiplierSLOW;
+    rotturn *= multiplierTable;
+    if(joystick.getPOV() >= 270 && joystick.getPOV() <= 90){
+      rot *= multiplierSLOW;
+      fwd *= multiplierSLOW;
+      leftOut.Output = 1;
+      rightOut.Output = -1;
     }
-    if(!joystick.getRawButton(6)){
-      turntable.set(0);
+    else if (joystick.getPOV() <= 270 && joystick.getPOV() >= 90)
+    {
+      rot *= multiplierSLOW;
+      fwd *= multiplierSLOW;
+      leftOut.Output = -1;
+      rightOut.Output = 1;
     }
-
-
     /* Set output to control frames */
     leftOut.Output = fwd + rot;
     rightOut.Output = fwd - rot;
     /* And set them to the motors */
     if (!joystick1.getRawButton(1)) {
       leftLeader.setControl(leftOut);
+      //set pid values
       rightLeader.setControl(rightOut);
+      armPitch.set(pitchturn);
+      armPitch2.set(-pitchturn);
+      turntable.set(rotturn);
     }
   }
     
@@ -204,6 +203,9 @@ public class Robot extends TimedRobot {
      rightOut.Output = 0;
      leftLeader.setControl(leftOut);
      rightLeader.setControl(rightOut);
+     armPitch.set(0);
+     armPitch2.set(0);
+     turntable.set(0);
   }
 
   @Override
