@@ -60,8 +60,9 @@ public class Robot extends TimedRobot {
         
   PS4Controller joystick;
   Joystick joystick1;
+
   DifferentialDriveOdometry m_odometry;
-  // Creating my kinematics object: track width of 27 inches
+  // Creating my kinematics object: track width of 0.58 meters
   DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(0.58);
   // Example chassis speeds: 2 meters per second linear velocity,
   // 1 radian per second angular velocity.
