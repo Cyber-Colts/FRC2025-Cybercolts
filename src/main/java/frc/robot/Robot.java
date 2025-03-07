@@ -181,11 +181,16 @@ public class Robot extends TimedRobot {
     double multiplierSLOW = 0.1;
 
     // Apply the multiplier to the joystick inputs
-    if (joystick.getR1Button()) {
+    boolean wasPressed = false;
+    if (joystick.getR1Button() || wasPressed) {
+      if(!wasPressed){
+        wasPressed = true;
+      }
       rot *= multiplier;
       fwd *= multiplier;
     }
     else{
+      wasPressed = false; //redundant
       rot *= multiplierNormal;
       fwd *= multiplierNormal;
     }
