@@ -25,42 +25,80 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
 import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
+import edu.wpi.first.net.PortForwarder;
+import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.networktables.NetworkTableEntry;
+import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.PS4Controller;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
+
+
 public class Robot extends TimedRobot {
-        
   private final CANBus kCANBus = new CANBus();
-        
+
   private final TalonFX leftLeader = new TalonFX(1, kCANBus);
   private final TalonFX leftFollower = new TalonFX(2, kCANBus);
   private final TalonFX rightLeader = new TalonFX(3, kCANBus);
   private final TalonFX rightFollower = new TalonFX(4, kCANBus);
-          
+  
   private final DutyCycleOut leftOut = new DutyCycleOut(0);
   private final DutyCycleOut rightOut = new DutyCycleOut(0);
+  
+  private final Timer m_timer = new Timer();
+
   SparkMax turntable;
   SparkMax armPitch;
   SparkMax armPitch2;
   SparkMax armExt;
-  SparkMax Rollers;
-  SparkMax IntakeExt;
-          
-  double encoderRaw;
-  double encoderRawL;
-  double encoderRawR;
-  double wheelPosL;
-  double wheelPosR;
-        
-        
+  SparkMax hand;
+  
+  double encoderRaw; double encoderRawL; double encoderRawR;
+  double wheelPosL; double wheelPosR;
+  double avgTagArea; double avgTagDist;
+  double x; double y; 
+  double area; 
+  double left_command; 
+  double right_command; double forward_command; double backward_command; 
+  double xHeading_error; double yHeading_error; 
+  double x_adjust; double y_adjust;
+
+  float Kp;
+  float min_command;
+  
+  // Basic targeting data
+ 
+  double getTagID = LimelightHelpers.getFiducialID("limelight");
+
+  double tx = LimelightHelpers.getTX("limelight");  // Horizontal offset from crosshair to target in degrees
+  double ty = LimelightHelpers.getTY("limelight");  // Vertical offset from crosshair to target in degrees
+  double ta = LimelightHelpers.getTA("limelight");  // Target area (0% to 100% of image)
+  boolean hasTarget = LimelightHelpers.getTV("limelight"); // Do you have a valid target?
+
+  double txnc = LimelightHelpers.getTXNC("limelight");  // Horizontal offset from principal pixel/point to target in degrees
+  double tync = LimelightHelpers.getTYNC("limelight");  // Vertical  offset from principal pixel/point to target in degrees
+
+  NetworkTable table = NetworkTableInstance.getDefault().getTable("limelight");
+  NetworkTableEntry tableE = table.getEntry("tableE");
+  double targetOffsetAngle_Vertical = tableE.getDouble(0.0);
+  double limelightMountAngleDegrees = 25.0; // how many degrees back is your limelight rotated from perfectly vertical?
+  double limelightLensHeightInches = 8.0; // distance from the center of the Limelight lens to the floor
+  double goalHeightInches = 60.0; // distance from the target to the floor
+  double angleToGoalDegrees = limelightMountAngleDegrees + targetOffsetAngle_Vertical;
+  double angleToGoalRadians = angleToGoalDegrees * (3.14159/180.0); // converts to radians
+  
+  double distanceFromLimelightToGoalInches = (goalHeightInches - limelightLensHeightInches) / Math.tan(angleToGoalRadians); //calculate distance
+  double Estimate_Distance = distanceFromLimelightToGoalInches;
+
   PS4Controller joystick;
   Joystick joystick1;
-
+  
   DifferentialDriveOdometry m_odometry;
   // Creating my kinematics object: track width of 0.58 meters
   DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(0.58);
@@ -71,9 +109,9 @@ public class Robot extends TimedRobot {
   DifferentialDriveWheelSpeeds wheelSpeeds;
 
   // Left velocity
-  double leftVelocity = wheelSpeeds.leftMetersPerSecond;
+  //double leftVelocity = wheelSpeeds.leftMetersPerSecond;
   // Right velocity
-  double rightVelocity = wheelSpeeds.rightMetersPerSecond;
+  //double rightVelocity = wheelSpeeds.rightMetersPerSecond;
   
   AHRS m_gyro = new AHRS(NavXComType.kMXP_SPI);
   
@@ -85,18 +123,20 @@ public class Robot extends TimedRobot {
   PowerDistribution PDP = new PowerDistribution(10, ModuleType.kRev);
   Field2d m_field = new Field2d();
 
-
   public Robot() {
-    
+    PortForwarder.add(5801, "limelight.local", 5801);
+
+
     var leftConfiguration = new TalonFXConfiguration();
     var rightConfiguration = new TalonFXConfiguration();
     turntable = new SparkMax(5, MotorType.kBrushless);
     armPitch = new SparkMax(6, MotorType.kBrushless);
     armPitch2 = new SparkMax(7, MotorType.kBrushless);
-    armExt = new SparkMax(8, MotorType.kBrushless);
+
 
     SparkMaxConfig launcherConfig = new SparkMaxConfig();
 
+    //table = NetworkTable.getTable("datatable");
 
     /* User can optionally change the configs or leave it alone to perform a factory default */
     leftConfiguration.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
@@ -111,7 +151,6 @@ public class Robot extends TimedRobot {
     turntable.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armPitch.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armPitch2.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
-    armExt.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
     leftLeader.getConfigurator().apply(leftConfiguration);
     leftFollower.getConfigurator().apply(leftConfiguration);
@@ -120,6 +159,7 @@ public class Robot extends TimedRobot {
 
     leftLeader.setSafetyEnabled(true);
     rightLeader.setSafetyEnabled(true);
+
     // Initialize joystick
     joystick = new PS4Controller(0);
     joystick1 = new Joystick(1);
@@ -132,13 +172,6 @@ public class Robot extends TimedRobot {
 
   @Override
   public void robotPeriodic() {
-    var wheelSpeeds = kinematics.toWheelSpeeds(chassisSpeeds);
-    //Update Pose on field
-    m_odometry.update(m_gyro.getRotation2d(),
-      getEncoderLeft(),
-      getEncoderRight());
-     
-    m_field.setRobotPose(m_odometry.getPoseMeters());
     // Display the applied output of the left and right side onto the dashboard
     SmartDashboard.putData("Field", m_field);
     SmartDashboard.putBoolean("Teleop Is On", isTeleopEnabled());
@@ -147,23 +180,126 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Left Encoder", getEncoderLeft());
     SmartDashboard.putNumber("Turntable Encoder", getEncoderTurntable());
     SmartDashboard.putNumber("Speed", m_gyro.getRobotCentricVelocityX());
-    SmartDashboard.putNumber("ODOMVelocityL", leftVelocity);
-    SmartDashboard.putNumber("ODOMVelocityR", rightVelocity);
     SmartDashboard.putNumber("Pitch", m_gyro.getPitch());
+    m_field.setRobotPose(m_odometry.getPoseMeters());
     SmartDashboard.putData("PDP",PDP);
+    SmartDashboard.putNumber("LimelightX", tx);
+    SmartDashboard.putNumber("LimelightY", ty);
+    SmartDashboard.putNumber("LimelightArea", ta);
   }
+  /*public void limelightTarget() {
+    xHeading_error = -x;
+    yHeading_error = -y;
+    x_adjust = 0.0f;
+    y_adjust = 0.0f;
+    if (x > 1.0)
+    {
+      x_adjust = Kp*xHeading_error - min_command;
+    }
+    else if (x < 1.0)
+    {
+      x_adjust = Kp*xHeading_error + min_command;
+    }
+    left_command += x_adjust;
+    right_command -= x_adjust;
+
+    if (y > 1.0)
+    {
+      y_adjust = Kp*yHeading_error - min_command;
+    }
+    else if (y < 1.0)
+    {
+      y_adjust = Kp*yHeading_error + min_command;
+    }
+    forward_command += y_adjust;
+    backward_command -= y_adjust;
+
+    m_robotDrive.driveCartesian(y_adjust, x_adjust, 0.0);
+
+  }*/
 
   @Override
   public void autonomousInit() {
+    //var limelightName = "limelight";
+    m_timer.reset();
+    m_timer.start();
+    leftLeader.set(0);
+    rightLeader.set(0);
+    m_gyro.setAngleAdjustment(0);
+    // Set a custom crop window for improved performance (-1 to 1 for each value)
+    /*LimelightHelpers.setCropWindow(limelightName, -0.5, 0.5, -0.5, 0.5);
+    // Change the camera pose relative to robot center (x forward, y left, z up, degrees)
+    LimelightHelpers.setCameraPose_RobotSpace(limelightName, 0.5, 0.0, 0.5, 0.0, 30.0, 0.0);
+    // Set AprilTag offset tracking point (meters)
+    LimelightHelpers.setFiducial3DOffset(limelightName, 0.0, 0.0, 0.5);
+    // Configure AprilTag detection
+    LimelightHelpers.SetFiducialIDFiltersOverride(limelightName, new int[]{0, 1, 2}); // Only track these tag IDs
+    LimelightHelpers.SetFiducialDownscalingOverride(limelightName, 2.0f); // Process at half resolution for improved framerate and reduced range
+    */
   }
-
+  
   @Override
   public void autonomousPeriodic() {
+    double autoFwd = 0.2;
+    double autoFwdSlow = 0.05;
+    double autoRot = 0.07; // Invert depending on side of the field
+    double autoStop = 0;
+    double heading = m_gyro.getAngle();
+    double mtAmount = 1;
+    LimelightHelpers.PoseEstimate mt1 = LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight");
+    var mtCheck = hasTarget == true && mt1.tagCount == mtAmount && ta >= 0.1;
+    double mtID = 0;
+    double mtID1_2 = 1;
+    double degrees1 = 0;
+    double degrees2 = 0;
+
+    if (mtCheck && getTagID == 1) {
+      degrees1 = 44.0;
+      degrees2 = 46.0;
+    } else if (mtCheck && getTagID == 2) {
+      degrees1 = -44.0;
+      degrees2 = -46.0;
+      mtID1_2 = 2;
+    }
+
+    if (m_timer.get() > 0.0 && m_timer.get() < 10.0) { //DRIVE FORWARD, 2 SECONDS
+      leftLeader.set(autoFwd);
+      rightLeader.set(autoFwd);
+      if(mtCheck && getTagID == mtID) {
+        if(mt1.rawFiducials[0].distToCamera > 13 && ta > 15) {
+          leftLeader.set(autoFwdSlow);
+          rightLeader.set(autoFwdSlow);
+        } else if(mt1.rawFiducials[0].distToCamera < 11 && ta < 20) {
+          leftLeader.set(-autoFwdSlow);
+          rightLeader.set(-autoFwdSlow);
+        }
+        leftLeader.set(autoStop);
+        rightLeader.set(autoStop);
+      } else if (mtCheck && getTagID == mtID1_2) {
+        if (heading < degrees1) {
+          leftLeader.set(autoRot);
+          rightLeader.set(-autoRot);
+        } else if (heading > degrees2) {
+          leftLeader.set(-autoRot);
+          rightLeader.set(autoRot);
+        } 
+        if(mt1.rawFiducials[0].distToCamera > 13 && ta > 15) {
+          leftLeader.set(autoFwdSlow);
+          rightLeader.set(autoFwdSlow);
+        } else if(mt1.rawFiducials[0].distToCamera < 11 && ta < 20) {
+          leftLeader.set(-autoFwdSlow);
+          rightLeader.set(-autoFwdSlow);
+        }
+        leftLeader.set(autoStop);
+        rightLeader.set(autoStop);
+      } 
+    }
   }
 
   @Override
   public void teleopInit() {
   }
+
   //TELEOP CODE
   @Override
   public void teleopPeriodic() {
@@ -176,40 +312,32 @@ public class Robot extends TimedRobot {
     double fwd = -joystick.getRawAxis(1);
     double rot = joystick.getRawAxis(2);
     double multiplier = 0.6;
-    double multiplierNormal = 0.3;
-    double multiplierTable = 0.3; 
+    double multiplierPitch = 0.5;
+    double multiplierNormal = 0.5;
+    double multiplierTable = 0.6; 
     double multiplierSLOW = 0.1;
 
     // Apply the multiplier to the joystick inputs
-    boolean wasPressed = false;
-    if (joystick.getR1Button() || wasPressed) {
-      if(!wasPressed){
-        wasPressed = true;
-      }
+    if (joystick.getR1Button()) {
       rot *= multiplier;
       fwd *= multiplier;
     }
     else{
-      wasPressed = false; //redundant
       rot *= multiplierNormal;
       fwd *= multiplierNormal;
     }
     double pitchturn = joystick1.getRawAxis(1);
     double rotturn = -joystick1.getRawAxis(0);
-    pitchturn *= multiplierSLOW;
+    pitchturn *= multiplierNormal;
     rotturn *= multiplierTable;
     if(joystick.getPOV() >= 270 && joystick.getPOV() <= 90){
-      rot *= multiplierSLOW;
-      fwd *= multiplierSLOW;
-      leftOut.Output = 1;
-      rightOut.Output = -1;
+      leftLeader.set(10);
+      rightLeader.set(-10);
     }
     else if (joystick.getPOV() <= 270 && joystick.getPOV() >= 90)
     {
-      rot *= multiplierSLOW;
-      fwd *= multiplierSLOW;
-      leftOut.Output = -1;
-      rightOut.Output = 1;
+      leftLeader.set(-10);
+      rightLeader.set(10);
     }
     /* Set output to control frames */
     leftOut.Output = fwd + rot;
@@ -220,8 +348,9 @@ public class Robot extends TimedRobot {
       //set pid values
       rightLeader.setControl(rightOut);
       armPitch.set(pitchturn);
-      armPitch2.set(-pitchturn);
       turntable.set(rotturn);
+      armPitch2.set(-pitchturn);
+      //turntable.set(rotturn);
     }
   }
     
