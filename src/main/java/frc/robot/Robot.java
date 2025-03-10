@@ -37,7 +37,18 @@ import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import static frc.robot.Constants.*;
+import static frc.robot.Constants.AUTO_FWD;
+import static frc.robot.Constants.AUTO_FWD_SLOW;
+import static frc.robot.Constants.AUTO_ROT;
+import static frc.robot.Constants.AUTO_STOP;
+import static frc.robot.Constants.GOAL_HEIGHT_INCHES;
+import static frc.robot.Constants.LIMELIGHT_LENS_HEIGHT_INCHES;
+import static frc.robot.Constants.LIMELIGHT_MOUNT_ANGLE_DEGREES;
+import static frc.robot.Constants.MT_AMOUNT;
+import static frc.robot.Constants.MULTIPLIER;
+import static frc.robot.Constants.MULTIPLIER_NORMAL;
+import static frc.robot.Constants.MULTIPLIER_PITCH;
+import static frc.robot.Constants.MULTIPLIER_TABLE;
 
 public class Robot extends TimedRobot {
   private final CANBus kCANBus = new CANBus();
@@ -330,25 +341,20 @@ public class Robot extends TimedRobot {
     /* invert the joystick Y because forward Y is negative */
     double fwd = -joystick.getRawAxis(1);
     double rot = joystick.getRawAxis(2);
-    double multiplier = 0.6;
-    double multiplierPitch = 0.5;
-    double multiplierNormal = 0.5;
-    double multiplierTable = 0.4; 
-    double multiplierSLOW = 0.1;
 
     // Apply the multiplier to the joystick inputs
     if (joystick.getR1Button()) {
-      rot *= multiplier;
-      fwd *= multiplier;
+      rot *= MULTIPLIER;
+      fwd *= MULTIPLIER;
     }
     else{
-      rot *= multiplierNormal;
-      fwd *= multiplierNormal;
+      rot *= MULTIPLIER_NORMAL;
+      fwd *= MULTIPLIER_NORMAL;
     }
     double pitchturn = joystick1.getRawAxis(1);
     double rotturn = -joystick1.getRawAxis(0);
-    pitchturn *= multiplierPitch;
-    rotturn *= multiplierTable;
+    pitchturn *= MULTIPLIER_PITCH;
+    rotturn *= MULTIPLIER_TABLE;
     if(joystick.getPOV() >= 270 && joystick.getPOV() <= 90){
       leftLeader.set(10);
       rightLeader.set(-10);
