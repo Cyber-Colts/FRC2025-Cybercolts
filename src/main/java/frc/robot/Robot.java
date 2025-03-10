@@ -37,8 +37,14 @@ import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-
-
+import static frc.robot.Constants.AUTO_FWD;
+import static frc.robot.Constants.AUTO_FWD_SLOW;
+import static frc.robot.Constants.AUTO_ROT;
+import static frc.robot.Constants.AUTO_STOP;
+import static frc.robot.Constants.GOAL_HEIGHT_INCHES;
+import static frc.robot.Constants.LIMELIGHT_LENS_HEIGHT_INCHES;
+import static frc.robot.Constants.LIMELIGHT_MOUNT_ANGLE_DEGREES;
+import static frc.robot.Constants.MT_AMOUNT;
 
 public class Robot extends TimedRobot {
   private final CANBus kCANBus = new CANBus();
@@ -69,22 +75,11 @@ public class Robot extends TimedRobot {
   NetworkTable table = NetworkTableInstance.getDefault().getTable("limelight");
   NetworkTableEntry tableE = table.getEntry("tableE");
 
-  //limelight data
-  double limelightMountAngleDegrees = 25.0; // how many degrees back is your limelight rotated from perfectly vertical?
-  double limelightLensHeightInches = 8.0; // distance from the center of the Limelight lens to the floor
-  double goalHeightInches = 60.0; // distance from the target to the floor
   double targetOffsetAngle_Vertical;
   double angleToGoalDegrees;
   double angleToGoalRadians; // converts to radians
   
-  //speeds for auto
-  double autoFwd = 0.2;
-  double autoFwdSlow = 0.05;
-  double autoRot = 0.07; // Invert depending on side of the field
-  double autoStop = 0;
-
   double heading;
-  double mtAmount = 1;
   LimelightHelpers.PoseEstimate mt1;
   boolean mtCheck;
   double mtID = 0;
@@ -263,19 +258,19 @@ public class Robot extends TimedRobot {
       }
       // Check the functions below for the logic
       if (m_timer.get() > 0.0 && m_timer.get() < 10.0) { // DRIVE FORWARD, 10 SECONDS
-          drive(autoFwd, autoFwd);
+          drive(AUTO_FWD, AUTO_FWD);
           if (mtCheck && getTagID == mtID) {
-              adjustSpeedBasedOnDistance(mt1, autoFwdSlow, autoStop);
+              adjustSpeedBasedOnDistance(mt1, AUTO_FWD_SLOW, AUTO_STOP);
           } else if (mtCheck && getTagID == mtID1_2) {
-              rotateToTarget(heading, degrees1, degrees2, autoRot);
-              adjustSpeedBasedOnDistance(mt1, autoFwdSlow, autoStop);
+              rotateToTarget(heading, degrees1, degrees2, AUTO_ROT);
+              adjustSpeedBasedOnDistance(mt1, AUTO_FWD_SLOW, AUTO_STOP);
           }
       }
-      drive(autoStop, autoStop);
+      drive(AUTO_STOP, AUTO_STOP);
   }
 
   private void drive(double leftSpeed, double rightSpeed) {
-      // drivetrain control function 
+      // drivetrain control logic 
       leftLeader.set(leftSpeed);
       rightLeader.set(rightSpeed);
   }
@@ -320,10 +315,10 @@ public class Robot extends TimedRobot {
     txnc = LimelightHelpers.getTXNC("limelight");  // Horizontal offset from principal pixel/point to target in degrees
     tync = LimelightHelpers.getTYNC("limelight");  // Vertical  offset from principal pixel/point to target in degrees
     targetOffsetAngle_Vertical = tableE.getDouble(0.0);
-    angleToGoalDegrees = limelightMountAngleDegrees + targetOffsetAngle_Vertical;
+    angleToGoalDegrees = LIMELIGHT_MOUNT_ANGLE_DEGREES + targetOffsetAngle_Vertical;
     angleToGoalRadians = angleToGoalDegrees * (3.14159 / 180.0); // converts to radians
-    mtCheck = hasTarget && mt1.tagCount == mtAmount && ta >= 0.1;
-    distanceFromLimelightToGoalInches = (goalHeightInches - limelightLensHeightInches) / Math.tan(angleToGoalRadians); // calculate distance
+    mtCheck = hasTarget && mt1.tagCount == MT_AMOUNT && ta >= 0.1;
+    distanceFromLimelightToGoalInches = (GOAL_HEIGHT_INCHES - LIMELIGHT_LENS_HEIGHT_INCHES) / Math.tan(angleToGoalRadians); // calculate distance
     Estimate_Distance = distanceFromLimelightToGoalInches;
 }
 
