@@ -57,44 +57,47 @@ public class Robot extends TimedRobot {
   SparkMax armPitch;
   SparkMax armPitch2;
   SparkMax armExt;
-  SparkMax hand;
-  
+
   double encoderRaw; double encoderRawL; double encoderRawR;
   double wheelPosL; double wheelPosR;
-  double avgTagArea; double avgTagDist;
-  double x; double y; 
-  double area; 
-  double left_command; 
-  double right_command; double forward_command; double backward_command; 
-  double xHeading_error; double yHeading_error; 
-  double x_adjust; double y_adjust;
-
-  float Kp;
-  float min_command;
   
   // Basic targeting data
- 
-  double getTagID = LimelightHelpers.getFiducialID("limelight");
-
-  double tx = LimelightHelpers.getTX("limelight");  // Horizontal offset from crosshair to target in degrees
-  double ty = LimelightHelpers.getTY("limelight");  // Vertical offset from crosshair to target in degrees
-  double ta = LimelightHelpers.getTA("limelight");  // Target area (0% to 100% of image)
-  boolean hasTarget = LimelightHelpers.getTV("limelight"); // Do you have a valid target?
-
-  double txnc = LimelightHelpers.getTXNC("limelight");  // Horizontal offset from principal pixel/point to target in degrees
-  double tync = LimelightHelpers.getTYNC("limelight");  // Vertical  offset from principal pixel/point to target in degrees
+  double tx;
+  double ty;
+  double ta;
 
   NetworkTable table = NetworkTableInstance.getDefault().getTable("limelight");
   NetworkTableEntry tableE = table.getEntry("tableE");
-  double targetOffsetAngle_Vertical = tableE.getDouble(0.0);
+
+  //limelight data
   double limelightMountAngleDegrees = 25.0; // how many degrees back is your limelight rotated from perfectly vertical?
   double limelightLensHeightInches = 8.0; // distance from the center of the Limelight lens to the floor
   double goalHeightInches = 60.0; // distance from the target to the floor
-  double angleToGoalDegrees = limelightMountAngleDegrees + targetOffsetAngle_Vertical;
-  double angleToGoalRadians = angleToGoalDegrees * (3.14159/180.0); // converts to radians
+  double targetOffsetAngle_Vertical;
+  double angleToGoalDegrees;
+  double angleToGoalRadians; // converts to radians
   
-  double distanceFromLimelightToGoalInches = (goalHeightInches - limelightLensHeightInches) / Math.tan(angleToGoalRadians); //calculate distance
-  double Estimate_Distance = distanceFromLimelightToGoalInches;
+  //speeds for auto
+  double autoFwd = 0.2;
+  double autoFwdSlow = 0.05;
+  double autoRot = 0.07; // Invert depending on side of the field
+  double autoStop = 0;
+
+  double heading;
+  double mtAmount = 1;
+  LimelightHelpers.PoseEstimate mt1;
+  boolean mtCheck;
+  double mtID = 0;
+  double getTagID;
+  double mtID1_2 = 1;
+  boolean hasTarget;
+  double tync;
+  double txnc;
+  double degrees1 = 0;
+  double degrees2 = 0;
+
+  double distanceFromLimelightToGoalInches; //calculate distance
+  double Estimate_Distance;
 
   PS4Controller joystick;
   Joystick joystick1;
@@ -124,8 +127,10 @@ public class Robot extends TimedRobot {
   Field2d m_field = new Field2d();
 
   public Robot() {
+    //all the ports the limelight needs for configuartions
     PortForwarder.add(5801, "limelight.local", 5801);
-
+    PortForwarder.add(5800, "limelight.local", 5800);
+    PortForwarder.add(5805, "limelight.local", 5805);
 
     var leftConfiguration = new TalonFXConfiguration();
     var rightConfiguration = new TalonFXConfiguration();
@@ -172,7 +177,9 @@ public class Robot extends TimedRobot {
 
   @Override
   public void robotPeriodic() {
-    // Display the applied output of the left and right side onto the dashboard
+    // Update limelight detection data
+    updateLimelightData();
+    // Display the data onto the dashboard
     SmartDashboard.putData("Field", m_field);
     SmartDashboard.putBoolean("Teleop Is On", isTeleopEnabled());
     SmartDashboard.putData("Gyro", m_gyro);
@@ -183,9 +190,14 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Pitch", m_gyro.getPitch());
     m_field.setRobotPose(m_odometry.getPoseMeters());
     SmartDashboard.putData("PDP",PDP);
-    SmartDashboard.putNumber("LimelightX", tx);
-    SmartDashboard.putNumber("LimelightY", ty);
-    SmartDashboard.putNumber("LimelightArea", ta);
+    //SmartDashboard.putNumber("LimelightX", tx);
+    //SmartDashboard.putNumber("LimelightY", ty);
+    /*
+    TODO: remove this on the future, we only use this to see if the code is reading the limelight
+    but the limelight already broadcasts the data to the networktable by itself
+    */
+    SmartDashboard.putNumber("LimelightArea", LimelightHelpers.getTA("limelight"));
+    SmartDashboard.putNumber("LimelightID", LimelightHelpers.getFiducialID("limelight"));
   }
   /*public void limelightTarget() {
     xHeading_error = -x;
@@ -240,61 +252,80 @@ public class Robot extends TimedRobot {
   
   @Override
   public void autonomousPeriodic() {
-    double autoFwd = 0.2;
-    double autoFwdSlow = 0.05;
-    double autoRot = 0.07; // Invert depending on side of the field
-    double autoStop = 0;
-    double heading = m_gyro.getAngle();
-    double mtAmount = 1;
-    LimelightHelpers.PoseEstimate mt1 = LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight");
-    var mtCheck = hasTarget == true && mt1.tagCount == mtAmount && ta >= 0.1;
-    double mtID = 0;
-    double mtID1_2 = 1;
-    double degrees1 = 0;
-    double degrees2 = 0;
-
-    if (mtCheck && getTagID == 1) {
-      degrees1 = 44.0;
-      degrees2 = 46.0;
-    } else if (mtCheck && getTagID == 2) {
-      degrees1 = -44.0;
-      degrees2 = -46.0;
-      mtID1_2 = 2;
-    }
-
-    if (m_timer.get() > 0.0 && m_timer.get() < 10.0) { //DRIVE FORWARD, 2 SECONDS
-      leftLeader.set(autoFwd);
-      rightLeader.set(autoFwd);
-      if(mtCheck && getTagID == mtID) {
-        if(mt1.rawFiducials[0].distToCamera > 13 && ta > 15) {
-          leftLeader.set(autoFwdSlow);
-          rightLeader.set(autoFwdSlow);
-        } else if(mt1.rawFiducials[0].distToCamera < 11 && ta < 20) {
-          leftLeader.set(-autoFwdSlow);
-          rightLeader.set(-autoFwdSlow);
-        }
-        leftLeader.set(autoStop);
-        rightLeader.set(autoStop);
-      } else if (mtCheck && getTagID == mtID1_2) {
-        if (heading < degrees1) {
-          leftLeader.set(autoRot);
-          rightLeader.set(-autoRot);
-        } else if (heading > degrees2) {
-          leftLeader.set(-autoRot);
-          rightLeader.set(autoRot);
-        } 
-        if(mt1.rawFiducials[0].distToCamera > 13 && ta > 15) {
-          leftLeader.set(autoFwdSlow);
-          rightLeader.set(autoFwdSlow);
-        } else if(mt1.rawFiducials[0].distToCamera < 11 && ta < 20) {
-          leftLeader.set(-autoFwdSlow);
-          rightLeader.set(-autoFwdSlow);
-        }
-        leftLeader.set(autoStop);
-        rightLeader.set(autoStop);
-      } 
-    }
+    //limelight logic
+      if (mtCheck && getTagID == 1) {
+          degrees1 = 44.0;
+          degrees2 = 46.0;
+      } else if (mtCheck && getTagID == 2) {
+          degrees1 = -44.0;
+          degrees2 = -46.0;
+          mtID1_2 = 2;
+      }
+      // Check the functions below for the logic
+      if (m_timer.get() > 0.0 && m_timer.get() < 10.0) { // DRIVE FORWARD, 10 SECONDS
+          drive(autoFwd, autoFwd);
+          if (mtCheck && getTagID == mtID) {
+              adjustSpeedBasedOnDistance(mt1, autoFwdSlow, autoStop);
+          } else if (mtCheck && getTagID == mtID1_2) {
+              rotateToTarget(heading, degrees1, degrees2, autoRot);
+              adjustSpeedBasedOnDistance(mt1, autoFwdSlow, autoStop);
+          }
+      }
+      drive(autoStop, autoStop);
   }
+
+  private void drive(double leftSpeed, double rightSpeed) {
+      // drivetrain control function 
+      leftLeader.set(leftSpeed);
+      rightLeader.set(rightSpeed);
+  }
+
+  private void adjustSpeedBasedOnDistance(LimelightHelpers.PoseEstimate mt1, double autoFwdSlow, double autoStop) {
+    /*
+     * Adjust speed based on distance to target
+     * If the distance is greater than 1 meter and the target area is greater than 3%, drive forward
+     * If the distance is less than 0.5 meters and the target area is less than 5%, drive backward
+     */
+
+     //TODO: fix Ficudal distance calculation (https://docs.limelightvision.io/docs/docs-limelight/tutorials/tutorial-estimating-distance)
+
+      if (mt1.rawFiducials[0].distToCamera > 1 && LimelightHelpers.getTA("limelight") > 3) {
+          drive(autoFwdSlow, autoFwdSlow);
+      } else if (mt1.rawFiducials[0].distToCamera < 0.5 && LimelightHelpers.getTA("limelight") < 5) {
+          drive(-autoFwdSlow, -autoFwdSlow);
+      }
+  }
+
+  private void rotateToTarget(double heading, double degrees1, double degrees2, double autoRot) {
+      /*
+       * Rotate to target based on the heading and the degrees of the target
+       * If the heading is less than the degrees of the target, rotate to the right
+       * If the heading is greater than the degrees of the target, rotate to the left
+       */
+      if (heading < degrees1) {
+          drive(autoRot, -autoRot);
+      } else if (heading > degrees2) {
+          drive(-autoRot, autoRot);
+      }
+  }
+
+  private void updateLimelightData() {
+    heading = m_gyro.getAngle();
+    mt1 = LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight");
+    getTagID = LimelightHelpers.getFiducialID("limelight");
+    tx = LimelightHelpers.getTX("limelight");  // Horizontal offset from crosshair to target in degrees
+    ty = LimelightHelpers.getTY("limelight");  // Vertical offset from crosshair to target in degrees
+    ta = LimelightHelpers.getTA("limelight");  // Target area (0% to 100% of image)
+    hasTarget = LimelightHelpers.getTV("limelight"); // Do you have a valid target?
+    txnc = LimelightHelpers.getTXNC("limelight");  // Horizontal offset from principal pixel/point to target in degrees
+    tync = LimelightHelpers.getTYNC("limelight");  // Vertical  offset from principal pixel/point to target in degrees
+    targetOffsetAngle_Vertical = tableE.getDouble(0.0);
+    angleToGoalDegrees = limelightMountAngleDegrees + targetOffsetAngle_Vertical;
+    angleToGoalRadians = angleToGoalDegrees * (3.14159 / 180.0); // converts to radians
+    mtCheck = hasTarget && mt1.tagCount == mtAmount && ta >= 0.1;
+    distanceFromLimelightToGoalInches = (goalHeightInches - limelightLensHeightInches) / Math.tan(angleToGoalRadians); // calculate distance
+    Estimate_Distance = distanceFromLimelightToGoalInches;
+}
 
   @Override
   public void teleopInit() {
@@ -314,7 +345,7 @@ public class Robot extends TimedRobot {
     double multiplier = 0.6;
     double multiplierPitch = 0.5;
     double multiplierNormal = 0.5;
-    double multiplierTable = 0.6; 
+    double multiplierTable = 0.4; 
     double multiplierSLOW = 0.1;
 
     // Apply the multiplier to the joystick inputs
@@ -328,7 +359,7 @@ public class Robot extends TimedRobot {
     }
     double pitchturn = joystick1.getRawAxis(1);
     double rotturn = -joystick1.getRawAxis(0);
-    pitchturn *= multiplierNormal;
+    pitchturn *= multiplierPitch;
     rotturn *= multiplierTable;
     if(joystick.getPOV() >= 270 && joystick.getPOV() <= 90){
       leftLeader.set(10);
