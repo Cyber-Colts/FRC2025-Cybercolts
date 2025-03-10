@@ -37,14 +37,7 @@ import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import static frc.robot.Constants.AUTO_FWD;
-import static frc.robot.Constants.AUTO_FWD_SLOW;
-import static frc.robot.Constants.AUTO_ROT;
-import static frc.robot.Constants.AUTO_STOP;
-import static frc.robot.Constants.GOAL_HEIGHT_INCHES;
-import static frc.robot.Constants.LIMELIGHT_LENS_HEIGHT_INCHES;
-import static frc.robot.Constants.LIMELIGHT_MOUNT_ANGLE_DEGREES;
-import static frc.robot.Constants.MT_AMOUNT;
+import static frc.robot.Constants.*;
 
 public class Robot extends TimedRobot {
   private final CANBus kCANBus = new CANBus();
