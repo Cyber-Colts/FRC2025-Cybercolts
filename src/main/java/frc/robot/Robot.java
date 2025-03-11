@@ -10,15 +10,20 @@ import com.ctre.phoenix6.controls.DutyCycleOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
+import com.revrobotics.spark.SparkAbsoluteEncoder;
+import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.SparkBase.ResetMode;
+import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.studica.frc.AHRS;
 import com.studica.frc.AHRS.NavXComType;
 
+import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
@@ -37,7 +42,18 @@ import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import static frc.robot.Constants.*;
+import static frc.robot.Constants.AUTO_FWD;
+import static frc.robot.Constants.AUTO_FWD_SLOW;
+import static frc.robot.Constants.AUTO_ROT;
+import static frc.robot.Constants.AUTO_STOP;
+import static frc.robot.Constants.GOAL_HEIGHT_INCHES;
+import static frc.robot.Constants.LIMELIGHT_LENS_HEIGHT_INCHES;
+import static frc.robot.Constants.LIMELIGHT_MOUNT_ANGLE_DEGREES;
+import static frc.robot.Constants.MT_AMOUNT;
+import static frc.robot.Constants.MULTIPLIER;
+import static frc.robot.Constants.MULTIPLIER_NORMAL;
+import static frc.robot.Constants.MULTIPLIER_PITCH;
+import static frc.robot.Constants.MULTIPLIER_TABLE;
 
 public class Robot extends TimedRobot {
   private final CANBus kCANBus = new CANBus();
@@ -51,19 +67,29 @@ public class Robot extends TimedRobot {
   private final DutyCycleOut rightOut = new DutyCycleOut(0);
   
   private final Timer m_timer = new Timer();
+  private SparkAbsoluteEncoder turntable_encoder;
+  private SparkAbsoluteEncoder throughBoreTurntableEncoder;
+  private SparkClosedLoopController PIDControllerTurntable;
+
+  private static final int SMART_MOTION_SLOT = 0;
+  // Offset in rotations to add to encoder value - offset from arm horizontal to sensor zero
+  private static final double ENCODER_OFFSET = -0.58342d;
+  private static final double GRAVITY_FF = 0.01;
+  private static final float LIMIT_BOTTOM = 0.5804f;
+  private static final float LIMIT_TOP = 0.8995f;
+
+  private Double targetPosition = null;
+
 
   SparkMax turntable;
-  SparkMax armPitch;
-  SparkMax armPitch2;
+  SparkMax armPitch;  SparkMax armPitch2;
   SparkMax armExt;
 
   double encoderRaw; double encoderRawL; double encoderRawR;
   double wheelPosL; double wheelPosR;
   
   // Basic targeting data
-  double tx;
-  double ty;
-  double ta;
+  double tx;  double ty; double ta;
 
   NetworkTable table = NetworkTableInstance.getDefault().getTable("limelight");
   NetworkTableEntry tableE = table.getEntry("tableE");
@@ -79,8 +105,7 @@ public class Robot extends TimedRobot {
   double getTagID;
   double mtID1_2 = 1;
   boolean hasTarget;
-  double tync;
-  double txnc;
+  double tync;  double txnc;
   double degrees1 = 0;
   double degrees2 = 0;
 
@@ -113,9 +138,27 @@ public class Robot extends TimedRobot {
   */
   PowerDistribution PDP = new PowerDistribution(10, ModuleType.kRev);
   Field2d m_field = new Field2d();
+  public enum CoralPivotPositions {
+    L1(0.2),
+    L2(0),
+    L3(0),
+    L4(0);
 
+    private final double value;
+
+    CoralPivotPositions(double value) {
+        this.value = value;
+    }
+
+    public double getValue() {
+        return value;
+    }
+
+  }
   public Robot() {
     //all the ports the limelight needs for configuartions
+    CameraServer.startAutomaticCapture();
+    
     PortForwarder.add(5801, "limelight.local", 5801);
     PortForwarder.add(5800, "limelight.local", 5800);
     PortForwarder.add(5805, "limelight.local", 5805);
@@ -125,9 +168,13 @@ public class Robot extends TimedRobot {
     turntable = new SparkMax(5, MotorType.kBrushless);
     armPitch = new SparkMax(6, MotorType.kBrushless);
     armPitch2 = new SparkMax(7, MotorType.kBrushless);
-
+    PIDControllerTurntable = turntable.getClosedLoopController();
+    turntable_encoder = turntable.getAbsoluteEncoder();
+    armExt = new SparkMax(8, MotorType.kBrushless);
 
     SparkMaxConfig launcherConfig = new SparkMaxConfig();
+    SparkMaxConfig turntableConfig = new SparkMaxConfig();
+
 
     //table = NetworkTable.getTable("datatable");
 
@@ -140,6 +187,15 @@ public class Robot extends TimedRobot {
     launcherConfig
         .smartCurrentLimit(80)
         .idleMode(IdleMode.kBrake);
+    turntableConfig
+        .smartCurrentLimit(80)
+        .idleMode(IdleMode.kBrake);
+
+    turntableConfig.closedLoop
+        .feedbackSensor(FeedbackSensor.kAbsoluteEncoder)
+        .p(4)
+        .d(0)
+        .outputRange(-.5, .5);
 
     turntable.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armPitch.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
@@ -173,7 +229,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putData("Gyro", m_gyro);
     SmartDashboard.putNumber("Right Encoder", getEncoderRight());
     SmartDashboard.putNumber("Left Encoder", getEncoderLeft());
-    SmartDashboard.putNumber("Turntable Encoder", getEncoderTurntable());
+    SmartDashboard.putNumber("Turntable Encoder", getTurntablePosition());
     SmartDashboard.putNumber("Speed", m_gyro.getRobotCentricVelocityX());
     SmartDashboard.putNumber("Pitch", m_gyro.getPitch());
     m_field.setRobotPose(m_odometry.getPoseMeters());
@@ -276,10 +332,16 @@ public class Robot extends TimedRobot {
      */
 
      //TODO: fix Ficudal distance calculation (https://docs.limelightvision.io/docs/docs-limelight/tutorials/tutorial-estimating-distance)
-
-      if (mt1.rawFiducials[0].distToCamera > 1 && LimelightHelpers.getTA("limelight") > 3) {
+    /*
+    if (mt1.rawFiducials[0].distToCamera > 1 && LimelightHelpers.getTA("limelight") > 3) {
           drive(autoFwdSlow, autoFwdSlow);
-      } else if (mt1.rawFiducials[0].distToCamera < 0.5 && LimelightHelpers.getTA("limelight") < 5) {
+    } else if (mt1.rawFiducials[0].distToCamera < 0.5 && LimelightHelpers.getTA("limelight") < 5) {
+          drive(-autoFwdSlow, -autoFwdSlow);
+    }
+    */
+      if (mt1.rawFiducials[0].distToCamera > 1 && LimelightHelpers.getTA("limelight") < 1) {
+          drive(autoFwdSlow, autoFwdSlow);
+      } else if (mt1.rawFiducials[0].distToCamera < 0.5 && LimelightHelpers.getTA("limelight") < 1) {
           drive(-autoFwdSlow, -autoFwdSlow);
       }
   }
@@ -357,6 +419,15 @@ public class Robot extends TimedRobot {
     leftOut.Output = fwd + rot;
     rightOut.Output = fwd - rot;
     /* And set them to the motors */
+    if (joystick1.getRawButton(0)){
+      armExt.set(0.5);
+    }
+    else if (joystick1.getRawButton( 1)){
+      armExt.set(-0.5);
+    }
+    else{
+      armExt.set(0);
+    }
     if (!joystick1.getRawButton(1)) {
       leftLeader.setControl(leftOut);
       //set pid values
@@ -413,8 +484,15 @@ public class Robot extends TimedRobot {
     wheelPosR = Math.PI * 0.1524 / encoderRawR* 7.31;
     return wheelPosR;
   }
-  public double getEncoderTurntable() {
-    encoderRaw = turntable.getAbsoluteEncoder().getPosition();
-  return encoderRaw * 4;
+
+  public double getTurntablePosition() {
+    return turntable_encoder.getPosition();
+  }
+
+  public double getTurntableVelocity() {
+      return turntable_encoder.getVelocity();
+  }
+  public void pidSetPosition(CoralPivotPositions position) {
+      PIDControllerTurntable.setReference(position.getValue(), ControlType.kPosition);
   }
 }
