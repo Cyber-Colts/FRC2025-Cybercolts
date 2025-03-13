@@ -83,7 +83,7 @@ public class Robot extends TimedRobot {
 
   SparkMax turntable;
   SparkMax armPitch;  SparkMax armPitch2;
-  SparkMax armExt;
+  SparkMax armExt; SparkMax intakeRoller1; SparkMax intakeRoller2; SparkMax intakePivot; SparkMax armRot;
 
   double encoderRaw; double encoderRawL; double encoderRawR;
   double wheelPosL; double wheelPosR;
@@ -158,7 +158,7 @@ public class Robot extends TimedRobot {
   public Robot() {
     //all the ports the limelight needs for configuartions
     CameraServer.startAutomaticCapture();
-    
+        
     PortForwarder.add(5801, "limelight.local", 5801);
     PortForwarder.add(5800, "limelight.local", 5800);
     PortForwarder.add(5805, "limelight.local", 5805);
@@ -174,6 +174,7 @@ public class Robot extends TimedRobot {
 
     SparkMaxConfig launcherConfig = new SparkMaxConfig();
     SparkMaxConfig turntableConfig = new SparkMaxConfig();
+    SparkMaxConfig armExtConfig = new SparkMaxConfig();
 
 
     //table = NetworkTable.getTable("datatable");
@@ -190,6 +191,9 @@ public class Robot extends TimedRobot {
     turntableConfig
         .smartCurrentLimit(80)
         .idleMode(IdleMode.kBrake);
+    armExtConfig
+        .smartCurrentLimit(80)
+        .idleMode(IdleMode.kBrake);
 
     turntableConfig.closedLoop
         .feedbackSensor(FeedbackSensor.kAbsoluteEncoder)
@@ -197,9 +201,10 @@ public class Robot extends TimedRobot {
         .d(0)
         .outputRange(-.5, .5);
 
-    turntable.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    turntable.configure(turntableConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armPitch.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armPitch2.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    armExt.configure(armExtConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
     leftLeader.getConfigurator().apply(leftConfiguration);
     leftFollower.getConfigurator().apply(leftConfiguration);
@@ -332,7 +337,7 @@ public class Robot extends TimedRobot {
      */
 
      //TODO: fix Ficudal distance calculation (https://docs.limelightvision.io/docs/docs-limelight/tutorials/tutorial-estimating-distance)
-    /*
+    /*F
     if (mt1.rawFiducials[0].distToCamera > 1 && LimelightHelpers.getTA("limelight") > 3) {
           drive(autoFwdSlow, autoFwdSlow);
     } else if (mt1.rawFiducials[0].distToCamera < 0.5 && LimelightHelpers.getTA("limelight") < 5) {
@@ -407,22 +412,22 @@ public class Robot extends TimedRobot {
     pitchturn *= MULTIPLIER_PITCH;
     rotturn *= MULTIPLIER_TABLE;
     if(joystick.getPOV() >= 270 && joystick.getPOV() <= 90){
-      leftLeader.set(10);
-      rightLeader.set(-10);
+      leftLeader.set(20);
+      rightLeader.set(-20);
     }
     else if (joystick.getPOV() <= 270 && joystick.getPOV() >= 90)
     {
-      leftLeader.set(-10);
-      rightLeader.set(10);
+      leftLeader.set(-20);
+      rightLeader.set(20);
     }
     /* Set output to control frames */
     leftOut.Output = fwd + rot;
     rightOut.Output = fwd - rot;
     /* And set them to the motors */
-    if (joystick1.getRawButton(0)){
+    if (joystick1.getRawButton(1)){
       armExt.set(0.5);
     }
-    else if (joystick1.getRawButton( 1)){
+    else if (joystick1.getRawButton( 2)){
       armExt.set(-0.5);
     }
     else{
