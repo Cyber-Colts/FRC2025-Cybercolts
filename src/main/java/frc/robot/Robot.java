@@ -171,10 +171,16 @@ public class Robot extends TimedRobot {
     PIDControllerTurntable = turntable.getClosedLoopController();
     turntable_encoder = turntable.getAbsoluteEncoder();
     armExt = new SparkMax(8, MotorType.kBrushless);
+    intakeRoller1 = new SparkMax(11, MotorType.kBrushless);
+    intakeRoller2 = new SparkMax(12, MotorType.kBrushless);
+    intakePivot = new SparkMax(13, MotorType.kBrushless);
+    armRot  = new SparkMax(10, MotorType.kBrushless);
 
     SparkMaxConfig launcherConfig = new SparkMaxConfig();
     SparkMaxConfig turntableConfig = new SparkMaxConfig();
     SparkMaxConfig armExtConfig = new SparkMaxConfig();
+    SparkMaxConfig intakerotConfig = new SparkMaxConfig();
+
 
 
     //table = NetworkTable.getTable("datatable");
@@ -194,7 +200,9 @@ public class Robot extends TimedRobot {
     armExtConfig
         .smartCurrentLimit(80)
         .idleMode(IdleMode.kBrake);
-
+    intakerotConfig
+        .smartCurrentLimit(100)
+        .idleMode(IdleMode.kBrake);
     turntableConfig.closedLoop
         .feedbackSensor(FeedbackSensor.kAbsoluteEncoder)
         .p(4)
@@ -205,6 +213,13 @@ public class Robot extends TimedRobot {
     armPitch.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armPitch2.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armExt.configure(armExtConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+
+    intakeRoller1.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    intakeRoller2.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    intakePivot.configure(intakerotConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    armRot.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    
+
 
     leftLeader.getConfigurator().apply(leftConfiguration);
     leftFollower.getConfigurator().apply(leftConfiguration);
@@ -432,6 +447,15 @@ public class Robot extends TimedRobot {
     }
     else{
       armExt.set(0);
+    }
+    if (joystick1.getRawButton(3)){
+      intakePivot.set(0.3);
+    }
+    else if (joystick1.getRawButton(4)){
+      intakePivot.set(-0.3);
+    }
+    else{
+      intakePivot.set(0);
     }
     if (!joystick1.getRawButton(1)) {
       leftLeader.setControl(leftOut);
