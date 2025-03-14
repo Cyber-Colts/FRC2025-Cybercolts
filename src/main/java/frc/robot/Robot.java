@@ -24,14 +24,12 @@ import com.studica.frc.AHRS;
 import com.studica.frc.AHRS.NavXComType;
 
 import edu.wpi.first.cameraserver.CameraServer;
-import edu.wpi.first.math.VecBuilder;
-import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
 import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.net.PortForwarder;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
@@ -44,6 +42,8 @@ import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import frc.robot.LimelightHelpers.LimelightResults;
+
 import static frc.robot.Constants.AUTO_FWD;
 import static frc.robot.Constants.AUTO_FWD_SLOW;
 import static frc.robot.Constants.AUTO_ROT;
@@ -72,6 +72,9 @@ public class Robot extends TimedRobot {
   private SparkAbsoluteEncoder turntable_encoder;
   private SparkAbsoluteEncoder throughBoreTurntableEncoder;
   private SparkClosedLoopController PIDControllerTurntable;
+  private SparkAbsoluteEncoder armExtAbsoluteEncoder;
+  private SparkAbsoluteEncoder intakePivotAbsoluteEncoder;
+  private SparkAbsoluteEncoder armRotAbsoluteEncoder;
 
   private static final int SMART_MOTION_SLOT = 0;
   // Offset in rotations to add to encoder value - offset from arm horizontal to sensor zero
@@ -94,7 +97,10 @@ public class Robot extends TimedRobot {
   double tx;  double ty; double ta;
 
   NetworkTable table = NetworkTableInstance.getDefault().getTable("limelight");
+  NetworkTable table1 = NetworkTableInstance.getDefault().getTable("limelight-one");
   NetworkTableEntry tableE = table.getEntry("tableE");
+  NetworkTableEntry tableE1 = table.getEntry("tableE");
+
 
   double targetOffsetAngle_Vertical;
   double angleToGoalDegrees;
@@ -110,11 +116,12 @@ public class Robot extends TimedRobot {
   double tync;  double txnc;
   double degrees1 = 0;
   double degrees2 = 0;
-  boolean doRejectUpdate;
-  DifferentialDrivePoseEstimator m_poseEstimator;
+  double degrees = 0;
 
   double distanceFromLimelightToGoalInches; //calculate distance
   double Estimate_Distance;
+  //double limelightPose3DValues = LimelightHelpers.getCameraPose3d_TargetSpace("limelight");
+  //double limelight1Pose3DValues = LimelightHelpers.getCameraPose3d_TargetSpace("limelight-one");
 
   PS4Controller joystick;
   Joystick joystick1;
@@ -168,8 +175,8 @@ public class Robot extends TimedRobot {
     PortForwarder.add(5805, "limelight.local", 5805);
 
     PortForwarder.add(5801, "limelight-one.local", 5802);
-    PortForwarder.add(5800, "limelight-one.local", 5808);
-    PortForwarder.add(5805, "limelight-one.local", 5806);
+    PortForwarder.add(5800, "limelight-one.local", 5803);
+    PortForwarder.add(5805, "limelight-one.local", 5804);
 
     var leftConfiguration = new TalonFXConfiguration();
     var rightConfiguration = new TalonFXConfiguration();
@@ -240,24 +247,11 @@ public class Robot extends TimedRobot {
     // Initialize joystick
     joystick = new PS4Controller(0);
     joystick1 = new Joystick(1);
-    
-    m_poseEstimator =
-      new DifferentialDrivePoseEstimator(
-          kinematics,
-          m_gyro.getRotation2d(),
-          getEncoderLeft(),
-          getEncoderRight(),
-          new Pose2d(),
-          VecBuilder.fill(0.05, 0.05, Units.degreesToRadians(5)),
-          VecBuilder.fill(0.5, 0.5, Units.degreesToRadians(30)));
-    LimelightHelpers.SetRobotOrientation("limelight", m_poseEstimator.getEstimatedPosition().getRotation().getDegrees(), 0, 0, 0, 0, 0);
-    mt1 = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight");
-    /*
+
     m_odometry = new DifferentialDriveOdometry(
       m_gyro.getRotation2d(),
       getEncoderLeft(), getEncoderRight(),
       new Pose2d(5.0, 13.5, new Rotation2d()));
-    */
   }
 
   @Override
@@ -271,6 +265,9 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Right Encoder", getEncoderRight());
     SmartDashboard.putNumber("Left Encoder", getEncoderLeft());
     SmartDashboard.putNumber("Turntable Encoder", getTurntablePosition());
+    SmartDashboard.putNumber("Arm Extension", getArmExtPosition());
+    SmartDashboard.putNumber("Arm Pivot", getArmPivotPosition());
+    SmartDashboard.putNumber("Arm Rotation", getArmRotPosition());
     SmartDashboard.putNumber("Speed", m_gyro.getRobotCentricVelocityX());
     SmartDashboard.putNumber("Pitch", m_gyro.getPitch());
     m_field.setRobotPose(m_odometry.getPoseMeters());
@@ -282,10 +279,9 @@ public class Robot extends TimedRobot {
     but the limelight already broadcasts the data to the networktable by itself
     */
     SmartDashboard.putNumber("LimelightArea", LimelightHelpers.getTA("limelight"));
-    SmartDashboard.putNumber("Limelight Distance", mt1.rawFiducials[0].distToCamera);
+    SmartDashboard.putNumber("Limelight1TX", LimelightHelpers.getTX("limelight-one"));
     SmartDashboard.putNumber("LimelightID", LimelightHelpers.getFiducialID("limelight"));
-    SmartDashboard.putBoolean("IsLimelightUpdating", !doRejectUpdate);
-    
+    SmartDashboard.putNumber("Limelight1ID", LimelightHelpers.getFiducialID("limelight-one"));
   }
   /*public void limelightTarget() {
     xHeading_error = -x;
@@ -326,6 +322,8 @@ public class Robot extends TimedRobot {
     leftLeader.set(0);
     rightLeader.set(0);
     m_gyro.setAngleAdjustment(0);
+    LimelightHelpers.SetFiducialIDFiltersOverride("limelight", new int[]{0, 1, 2}); // Only track these tag IDs
+    LimelightHelpers.SetFiducialIDFiltersOverride("limelight-one", new int[]{0, 1, 2}); // Only track these tag IDs
     // Set a custom crop window for improved performance (-1 to 1 for each value)
     /*LimelightHelpers.setCropWindow(limelightName, -0.5, 0.5, -0.5, 0.5);
     // Change the camera pose relative to robot center (x forward, y left, z up, degrees)
@@ -341,30 +339,27 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     //limelight logic
+      degrees = 90;
       if (mtCheck && getTagID == 1) {
           degrees1 = 44.0;
           degrees2 = 46.0;
+          degrees = 135;
       } else if (mtCheck && getTagID == 2) {
           degrees1 = -44.0;
           degrees2 = -46.0;
+          degrees = 45;
           mtID1_2 = 2;
       }
       // Check the functions below for the logic
       if (m_timer.get() > 0.0 && m_timer.get() < 10.0) { // DRIVE FORWARD, 10 SECONDS
           drive(AUTO_FWD, AUTO_FWD);
-          if (mtCheck && getTagID == mtID && mt1.rawFiducials[0].txnc != 0) {
-            if (mt1.rawFiducials[0].txnc > 0) {
-              rotateToTarget(90, 92, 90, AUTO_ROT);
-            } else {
-              rotateToTarget(90, 90, 92, AUTO_ROT);
-            }
-            rotateToTarget(90, degrees1, degrees2, AUTO_ROT);
-          } 
           if (mtCheck && getTagID == mtID) {
               adjustSpeedBasedOnDistance(mt1, AUTO_FWD_SLOW, AUTO_STOP);
+              rotateToAlignXAxis(AUTO_ROT, heading, degrees, AUTO_FWD_SLOW, AUTO_STOP);
           } else if (mtCheck && getTagID == mtID1_2) {
-              rotateToTarget(m_gyro.getAngle(), degrees1, degrees2, AUTO_ROT);
+              rotateToTarget(heading, degrees1, degrees2, AUTO_ROT);
               adjustSpeedBasedOnDistance(mt1, AUTO_FWD_SLOW, AUTO_STOP);
+              rotateToAlignXAxis(AUTO_ROT, heading, degrees, AUTO_FWD_SLOW, AUTO_STOP);
           }
       }
       drive(AUTO_STOP, AUTO_STOP);
@@ -384,22 +379,11 @@ public class Robot extends TimedRobot {
      */
 
      //TODO: fix Ficudal distance calculation (https://docs.limelightvision.io/docs/docs-limelight/tutorials/tutorial-estimating-distance)
-    /*F
-    if (mt1.rawFiducials[0].distToCamera > 1 && LimelightHelpers.getTA("limelight") > 3) {
+      if (mt1.rawFiducials[0].distToCamera > 1) {
           drive(autoFwdSlow, autoFwdSlow);
-    } else if (mt1.rawFiducials[0].distToCamera < 0.5 && LimelightHelpers.getTA("limelight") < 5) {
+      } else if (mt1.rawFiducials[0].distToCamera < 0.5) {
           drive(-autoFwdSlow, -autoFwdSlow);
-    }
-    */
-      if (mt1.rawFiducials[0].distToCamera > 1 || LimelightHelpers.getTA("limelight") < 10) {
-          drive(autoFwdSlow, autoFwdSlow);
-      } else if (mt1.rawFiducials[0].distToCamera < 0.5 || LimelightHelpers.getTA("limelight") > 13) {
-          drive(-autoFwdSlow, -autoFwdSlow);
-      }
-      if (mt1.rawFiducials[0].distToCamera == 0.4){
-          drive(autoStop, autoStop);
-          autonomousExit();
-      }
+      } 
   }
 
   private void rotateToTarget(double heading, double degrees1, double degrees2, double autoRot) {
@@ -415,21 +399,23 @@ public class Robot extends TimedRobot {
       }
   }
 
+  private void rotateToAlignXAxis(double AUTO_ROT, double heading, double degrees, double autoFwdSlow, double autoStop){
+    if (heading < degrees) {
+      drive(AUTO_ROT, -AUTO_ROT);
+    } else if (LimelightHelpers.getTX("limelight-One") < 1) {
+      drive(autoFwdSlow, autoFwdSlow);
+    } else if (LimelightHelpers.getTX("limelight-One") > 1) {
+      drive(-autoFwdSlow, -autoFwdSlow);
+    } 
+  }
+
+  /*private void arm(double tx, double autoArmRot, double armRot) {
+      if (LimelightHelpers.getTX("limelight") < 1) {
+        
+      }
+  }*/
+
   private void updateLimelightData() {
-    if(Math.abs(m_gyro.getRate()) > 360)
-    {
-      doRejectUpdate = true;
-    }
-    if(mt1.tagCount == 0)
-    {
-      doRejectUpdate = true;
-    }
-    if(!doRejectUpdate)
-    {
-    m_poseEstimator.setVisionMeasurementStdDevs(VecBuilder.fill(.7,.7,9999999));
-    m_poseEstimator.addVisionMeasurement(
-          mt1.pose,
-          mt1.timestampSeconds);
     heading = m_gyro.getAngle();
     mt1 = LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight");
     getTagID = LimelightHelpers.getFiducialID("limelight");
@@ -445,8 +431,25 @@ public class Robot extends TimedRobot {
     mtCheck = hasTarget && mt1.tagCount == MT_AMOUNT && ta >= 0.1;
     distanceFromLimelightToGoalInches = (GOAL_HEIGHT_INCHES - LIMELIGHT_LENS_HEIGHT_INCHES) / Math.tan(angleToGoalRadians); // calculate distance
     Estimate_Distance = distanceFromLimelightToGoalInches;
-    }
-}
+  }
+
+  private void updateLimelightData1() {
+    heading = m_gyro.getAngle();
+    mt1 = LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight-One");
+    getTagID = LimelightHelpers.getFiducialID("limelight-One");
+    tx = LimelightHelpers.getTX("limelight-One");  // Horizontal offset from crosshair to target in degrees
+    ty = LimelightHelpers.getTY("limelight-One");  // Vertical offset from crosshair to target in degrees
+    ta = LimelightHelpers.getTA("limelight-One");  // Target area (0% to 100% of image)
+    hasTarget = LimelightHelpers.getTV("limelight-One"); // Do you have a valid target?
+    txnc = LimelightHelpers.getTXNC("limelight-One");  // Horizontal offset from principal pixel/point to target in degrees
+    tync = LimelightHelpers.getTYNC("limelight-One");  // Vertical  offset from principal pixel/point to target in degrees
+    targetOffsetAngle_Vertical = tableE1.getDouble(0.0);
+    angleToGoalDegrees = LIMELIGHT_MOUNT_ANGLE_DEGREES + targetOffsetAngle_Vertical;
+    angleToGoalRadians = angleToGoalDegrees * (3.14159 / 180.0); // converts to radians
+    mtCheck = hasTarget && mt1.tagCount == MT_AMOUNT && ta >= 0.1;
+    distanceFromLimelightToGoalInches = (GOAL_HEIGHT_INCHES - LIMELIGHT_LENS_HEIGHT_INCHES) / Math.tan(angleToGoalRadians); // calculate distance
+    Estimate_Distance = distanceFromLimelightToGoalInches;
+  }
 
   @Override
   public void teleopInit() {
@@ -491,22 +494,19 @@ public class Robot extends TimedRobot {
     rightOut.Output = fwd - rot;
     /* And set them to the motors */
     if (joystick1.getRawButton(1)){
-      intakeRoller1.set(0.5);
-      intakeRoller2.set(0.5);
+      armExt.set(0.5);
     }
     else if (joystick1.getRawButton( 2)){
-      intakeRoller1.set(-0.5);
-      intakeRoller2.set(0.5);
+      armExt.set(-0.5);
     }
     else{
-      intakeRoller1.set(0);
-      intakeRoller2.set(0);
+      armExt.set(0);
     }
     if (joystick1.getRawButton(3)){
-      intakePivot.set(0.3);
+      intakePivot.set(0.1);
     }
     else if (joystick1.getRawButton(4)){
-      intakePivot.set(-0.3);
+      intakePivot.set(-0.1);
     }
     else{
       intakePivot.set(0);
@@ -554,6 +554,10 @@ public class Robot extends TimedRobot {
   public void simulationPeriodic() {
   }
 
+  /*public double getTargetPose3d() {
+    LimelightHelpers.getTargetPose3d_CameraSpace("limelight");
+  }*/
+
   public double getEncoderLeft() {
     /*apply the multiplication of the gearbox ratio of 7.31:1 to the encoder value
     taking into account pi*6 inch wheel diameter (0.1524 meters)*/
@@ -575,6 +579,19 @@ public class Robot extends TimedRobot {
   public double getTurntableVelocity() {
       return turntable_encoder.getVelocity();
   }
+
+  public double getArmExtPosition() {
+    return armExtAbsoluteEncoder.getPosition();
+  }
+
+  public double getArmPivotPosition() {
+    return intakePivotAbsoluteEncoder.getPosition();
+  }
+
+  public double getArmRotPosition() {
+    return armRotAbsoluteEncoder.getPosition();
+  }
+
   public void pidSetPosition(CoralPivotPositions position) {
       PIDControllerTurntable.setReference(position.getValue(), ControlType.kPosition);
   }
