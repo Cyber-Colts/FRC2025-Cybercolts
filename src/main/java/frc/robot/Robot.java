@@ -284,6 +284,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("LimelightArea", LimelightHelpers.getTA("limelight"));
     SmartDashboard.putNumber("Limelight Distance", mt1.rawFiducials[0].distToCamera);
     SmartDashboard.putNumber("LimelightID", LimelightHelpers.getFiducialID("limelight"));
+    SmartDashboard.putBoolean("IsLimelightUpdating", !doRejectUpdate);
     
   }
   /*public void limelightTarget() {
