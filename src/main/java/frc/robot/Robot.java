@@ -24,12 +24,14 @@ import com.studica.frc.AHRS;
 import com.studica.frc.AHRS.NavXComType;
 
 import edu.wpi.first.cameraserver.CameraServer;
+import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
 import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.net.PortForwarder;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
@@ -108,6 +110,8 @@ public class Robot extends TimedRobot {
   double tync;  double txnc;
   double degrees1 = 0;
   double degrees2 = 0;
+  boolean doRejectUpdate;
+  DifferentialDrivePoseEstimator m_poseEstimator;
 
   double distanceFromLimelightToGoalInches; //calculate distance
   double Estimate_Distance;
@@ -162,6 +166,10 @@ public class Robot extends TimedRobot {
     PortForwarder.add(5801, "limelight.local", 5801);
     PortForwarder.add(5800, "limelight.local", 5800);
     PortForwarder.add(5805, "limelight.local", 5805);
+
+    PortForwarder.add(5801, "limelight-one.local", 5802);
+    PortForwarder.add(5800, "limelight-one.local", 5808);
+    PortForwarder.add(5805, "limelight-one.local", 5806);
 
     var leftConfiguration = new TalonFXConfiguration();
     var rightConfiguration = new TalonFXConfiguration();
@@ -232,11 +240,24 @@ public class Robot extends TimedRobot {
     // Initialize joystick
     joystick = new PS4Controller(0);
     joystick1 = new Joystick(1);
-
+    
+    m_poseEstimator =
+      new DifferentialDrivePoseEstimator(
+          kinematics,
+          m_gyro.getRotation2d(),
+          getEncoderLeft(),
+          getEncoderRight(),
+          new Pose2d(),
+          VecBuilder.fill(0.05, 0.05, Units.degreesToRadians(5)),
+          VecBuilder.fill(0.5, 0.5, Units.degreesToRadians(30)));
+    LimelightHelpers.SetRobotOrientation("limelight", m_poseEstimator.getEstimatedPosition().getRotation().getDegrees(), 0, 0, 0, 0, 0);
+    mt1 = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight");
+    /*
     m_odometry = new DifferentialDriveOdometry(
       m_gyro.getRotation2d(),
       getEncoderLeft(), getEncoderRight(),
       new Pose2d(5.0, 13.5, new Rotation2d()));
+    */
   }
 
   @Override
@@ -261,7 +282,9 @@ public class Robot extends TimedRobot {
     but the limelight already broadcasts the data to the networktable by itself
     */
     SmartDashboard.putNumber("LimelightArea", LimelightHelpers.getTA("limelight"));
+    SmartDashboard.putNumber("Limelight Distance", mt1.rawFiducials[0].distToCamera);
     SmartDashboard.putNumber("LimelightID", LimelightHelpers.getFiducialID("limelight"));
+    
   }
   /*public void limelightTarget() {
     xHeading_error = -x;
@@ -359,10 +382,14 @@ public class Robot extends TimedRobot {
           drive(-autoFwdSlow, -autoFwdSlow);
     }
     */
-      if (mt1.rawFiducials[0].distToCamera > 1 && LimelightHelpers.getTA("limelight") < 1) {
+      if (mt1.rawFiducials[0].distToCamera > 1 || LimelightHelpers.getTA("limelight") < 10) {
           drive(autoFwdSlow, autoFwdSlow);
-      } else if (mt1.rawFiducials[0].distToCamera < 0.5 && LimelightHelpers.getTA("limelight") < 1) {
+      } else if (mt1.rawFiducials[0].distToCamera < 0.5 || LimelightHelpers.getTA("limelight") > 13) {
           drive(-autoFwdSlow, -autoFwdSlow);
+      }
+      if (mt1.rawFiducials[0].distToCamera == 0.4){
+          drive(autoStop, autoStop);
+          autonomousExit();
       }
   }
 
@@ -380,6 +407,20 @@ public class Robot extends TimedRobot {
   }
 
   private void updateLimelightData() {
+    if(Math.abs(m_gyro.getRate()) > 360)
+    {
+      doRejectUpdate = true;
+    }
+    if(mt1.tagCount == 0)
+    {
+      doRejectUpdate = true;
+    }
+    if(!doRejectUpdate)
+    {
+    m_poseEstimator.setVisionMeasurementStdDevs(VecBuilder.fill(.7,.7,9999999));
+    m_poseEstimator.addVisionMeasurement(
+          mt1.pose,
+          mt1.timestampSeconds);
     heading = m_gyro.getAngle();
     mt1 = LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight");
     getTagID = LimelightHelpers.getFiducialID("limelight");
@@ -395,6 +436,7 @@ public class Robot extends TimedRobot {
     mtCheck = hasTarget && mt1.tagCount == MT_AMOUNT && ta >= 0.1;
     distanceFromLimelightToGoalInches = (GOAL_HEIGHT_INCHES - LIMELIGHT_LENS_HEIGHT_INCHES) / Math.tan(angleToGoalRadians); // calculate distance
     Estimate_Distance = distanceFromLimelightToGoalInches;
+    }
 }
 
   @Override
@@ -440,13 +482,16 @@ public class Robot extends TimedRobot {
     rightOut.Output = fwd - rot;
     /* And set them to the motors */
     if (joystick1.getRawButton(1)){
-      armExt.set(0.5);
+      intakeRoller1.set(0.5);
+      intakeRoller2.set(0.5);
     }
     else if (joystick1.getRawButton( 2)){
-      armExt.set(-0.5);
+      intakeRoller1.set(-0.5);
+      intakeRoller2.set(0.5);
     }
     else{
-      armExt.set(0);
+      intakeRoller1.set(0);
+      intakeRoller2.set(0);
     }
     if (joystick1.getRawButton(3)){
       intakePivot.set(0.3);
