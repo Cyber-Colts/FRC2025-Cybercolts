@@ -351,10 +351,18 @@ public class Robot extends TimedRobot {
       // Check the functions below for the logic
       if (m_timer.get() > 0.0 && m_timer.get() < 10.0) { // DRIVE FORWARD, 10 SECONDS
           drive(AUTO_FWD, AUTO_FWD);
+          if (mtCheck && getTagID == mtID && mt1.rawFiducials[0].txnc != 0) {
+            if (mt1.rawFiducials[0].txnc > 0) {
+              rotateToTarget(90, 92, 90, AUTO_ROT);
+            } else {
+              rotateToTarget(90, 90, 92, AUTO_ROT);
+            }
+            rotateToTarget(90, degrees1, degrees2, AUTO_ROT);
+          } 
           if (mtCheck && getTagID == mtID) {
               adjustSpeedBasedOnDistance(mt1, AUTO_FWD_SLOW, AUTO_STOP);
           } else if (mtCheck && getTagID == mtID1_2) {
-              rotateToTarget(heading, degrees1, degrees2, AUTO_ROT);
+              rotateToTarget(m_gyro.getAngle(), degrees1, degrees2, AUTO_ROT);
               adjustSpeedBasedOnDistance(mt1, AUTO_FWD_SLOW, AUTO_STOP);
           }
       }

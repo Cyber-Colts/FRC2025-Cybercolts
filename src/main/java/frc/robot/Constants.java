@@ -9,7 +9,7 @@ public class Constants {
     // Autonomous speeds
     public static final double AUTO_FWD = 0.4;
     public static final double AUTO_FWD_SLOW = 0.15;
-    public static final double AUTO_ROT = 0.07;
+    public static final double AUTO_ROT = 0.2;
     public static final double AUTO_STOP = 0;
 
     // Teleop multipliers
