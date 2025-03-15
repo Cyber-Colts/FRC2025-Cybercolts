@@ -1,7 +1,16 @@
 {
   "NetworkTables": {
     "transitory": {
+      "CameraPublisher": {
+        "USB Camera 0": {
+          "open": true
+        },
+        "open": true
+      },
       "limelight": {
+        "open": true
+      },
+      "limelight-one": {
         "open": true
       }
     },
@@ -18,14 +27,24 @@
     "Connections": {
       "open": true
     },
+    "Elastic@1": {
+      "Subscribers": {
+        "open": true
+      }
+    },
     "Server": {
       "open": true
     },
     "limelight@1": {
-      "Subscribers": {
+      "Publishers": {
         "open": true
       },
       "open": true
+    },
+    "limelight@4": {
+      "Publishers": {
+        "open": true
+      }
     },
     "visible": true
   },
