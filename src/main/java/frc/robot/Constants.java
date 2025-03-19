@@ -7,8 +7,8 @@ public class Constants {
     public static final double GOAL_HEIGHT_INCHES = 60.0;
 
     // Autonomous speeds
-    public static final double AUTO_FWD = 0.3;
-    public static final double AUTO_FWD_SLOW = 0.2;
+    public static final double AUTO_FWD = 0.4;
+    public static final double AUTO_FWD_SLOW = 0.15;
     public static final double AUTO_ROT = 0.2;
     public static final double AUTO_STOP = 0;
 
