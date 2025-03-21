@@ -13,9 +13,9 @@ public class Constants {
     public static final double AUTO_STOP = 0;
 
     // Teleop multipliers
-    public static final double MULTIPLIER = 0.6;
+    public static final double MULTIPLIER = 0.8;
     public static final double MULTIPLIER_PITCH = 0.5;
-    public static final double MULTIPLIER_NORMAL = 0.5;
+    public static final double MULTIPLIER_NORMAL = 0.6;
     public static final double MULTIPLIER_TABLE = 0.4; 
     public static final double MULTIPLIER_SLOW = 0.1;
 
