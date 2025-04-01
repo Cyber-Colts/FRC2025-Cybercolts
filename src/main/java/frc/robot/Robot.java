@@ -11,7 +11,6 @@ import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.revrobotics.spark.SparkAbsoluteEncoder;
-import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.spark.SparkClosedLoopController;
@@ -43,12 +42,6 @@ import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import static frc.robot.Constants.AUTO_FWD_SLOW;
-import static frc.robot.Constants.AUTO_STOP;
-import static frc.robot.Constants.GOAL_HEIGHT_INCHES;
-import static frc.robot.Constants.LIMELIGHT_LENS_HEIGHT_INCHES;
-import static frc.robot.Constants.LIMELIGHT_MOUNT_ANGLE_DEGREES;
-import static frc.robot.Constants.MT_AMOUNT;
 import static frc.robot.Constants.MULTIPLIER;
 import static frc.robot.Constants.MULTIPLIER_NORMAL;
 
@@ -89,7 +82,7 @@ public class Robot extends TimedRobot {
 
   SparkMax turntable;
   SparkMax armPitch;  SparkMax armPitch2;
-  SparkMax armExt; SparkMax intakeRoller1; SparkMax intakeRoller2; SparkMax intakePivot; SparkMax armRot;
+  //SparkMax armExt; SparkMax intakeRoller1; SparkMax intakeRoller2; SparkMax intakePivot; SparkMax armRot;
   SparkMax lowerIntake;
 
   double encoderRaw; double encoderRawL; double encoderRawR;
@@ -121,6 +114,8 @@ public class Robot extends TimedRobot {
   boolean algaeLimit = false;
   boolean finalAlgaeLimit;
   double lowerIntakeValue = 0;
+  double startingPosition;
+  boolean isIntakeClosed;
 
   DifferentialDrivePoseEstimator m_poseEstimator;
 
@@ -193,21 +188,21 @@ public class Robot extends TimedRobot {
     //turntable_encoder = turntable.getEncoder();
     turntable_encoder = new DutyCycleEncoder(0);
     armPitch_encoder = new DutyCycleEncoder(4);
-    armExt = new SparkMax(8, MotorType.kBrushless);
+    //armExt = new SparkMax(8, MotorType.kBrushless);
     //intakeRoller1 = new SparkMax(11, MotorType.kBrushless);
     //intakeRoller2 = new SparkMax(12, MotorType.kBrushless);
-    intakePivot = new SparkMax(13, MotorType.kBrushless);
-    armRot  = new SparkMax(10, MotorType.kBrushless);
+    //intakePivot = new SparkMax(13, MotorType.kBrushless);
+    //armRot  = new SparkMax(10, MotorType.kBrushless);
     lowerIntake = new SparkMax(14, MotorType.kBrushless);
 
     SparkMaxConfig launcherConfig = new SparkMaxConfig();
     SparkMaxConfig turntableConfig = new SparkMaxConfig();
-    SparkMaxConfig armExtConfig = new SparkMaxConfig();
-    SparkMaxConfig intakerotConfig = new SparkMaxConfig();
-    SparkMaxConfig intakePivotConfig = new SparkMaxConfig();
+    //SparkMaxConfig armExtConfig = new SparkMaxConfig();
+    //SparkMaxConfig intakerotConfig = new SparkMaxConfig();
+    //SparkMaxConfig intakePivotConfig = new SparkMaxConfig();
     SparkMaxConfig lowerIntakeConfig = new SparkMaxConfig();
 
-
+    //If you are reading this, you're awesome
 
     //table = NetworkTable.getTable("datatable");
 
@@ -223,15 +218,18 @@ public class Robot extends TimedRobot {
     turntableConfig
         .smartCurrentLimit(80)
         .idleMode(IdleMode.kBrake);
-    armExtConfig
+    /*armExtConfig
         .smartCurrentLimit(100)
         .idleMode(IdleMode.kBrake);
-    intakePivotConfig
+    
+        intakePivotConfig
         .smartCurrentLimit(80)
         .idleMode(IdleMode.kBrake);
-    intakerotConfig
+    
+        intakerotConfig
         .smartCurrentLimit(100)
         .idleMode(IdleMode.kBrake);
+    */
     lowerIntakeConfig
         .smartCurrentLimit(80)
         .idleMode(IdleMode.kCoast);
@@ -244,12 +242,12 @@ public class Robot extends TimedRobot {
     turntable.configure(turntableConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armPitch.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     armPitch2.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
-    armExt.configure(armExtConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    //armExt.configure(armExtConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
     //intakeRoller1.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     //intakeRoller2.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
-    intakePivot.configure(intakePivotConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
-    armRot.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    //intakePivot.configure(intakePivotConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    //armRot.configure(launcherConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     lowerIntake.configure(lowerIntakeConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
     getCoral = false;
@@ -289,7 +287,7 @@ public class Robot extends TimedRobot {
   @Override
   public void robotPeriodic() {
     // Update limelight detection data
-    updateLimelightData();
+    //updateLimelightData();
     // Display the data onto the dashboard
     SmartDashboard.putData("Field", m_field);
     SmartDashboard.putBoolean("Teleop Is On", isTeleopEnabled());
@@ -300,11 +298,13 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Left Encoder", getEncoderLeft());
     SmartDashboard.putNumber("Turntable Encoder", getTurntablePosition());
     SmartDashboard.putBoolean("Turntable Encoder Boolean", getTurntableBoolean());
-    SmartDashboard.putNumber("Intake Pivot Encoder", getPivotPosition());
+    //SmartDashboard.putNumber("Intake Pivot Encoder", getPivotPosition());
     SmartDashboard.putNumber("Arm Pitch Encoder", getArmPitchPosition());
     SmartDashboard.putBoolean("Arm Pitch Boolean", getArmPitchBoolean());
-    SmartDashboard.putNumber("Arm Extension Encoder", getArmExtPosition());
+    //SmartDashboard.putNumber("Arm Extension Encoder", getArmExtPosition());
     SmartDashboard.putNumber("lowerintake Temp", lowerIntake.getMotorTemperature());
+    SmartDashboard.putNumber("Right Leader Position", getRightLeaderPosition());
+    SmartDashboard.putNumber("Left Leader Position", getLeftLeaderPosition());
     //SmartDashboard.putNumber("Speed", m_gyro.getRobotCentricVelocityX());
     SmartDashboard.putNumber("Pitch", m_gyro.getPitch());
     //m_field.setRobotPose(m_odometry.getPoseMeters());
@@ -355,19 +355,21 @@ public class Robot extends TimedRobot {
 
   @Override
   public void autonomousInit() {
-    var limelightName = "limelight";
-    m_timer.reset();
-    m_timer.start();
-    m1_timer.reset();
-    m1_timer.stop();
+    //var limelightName = "limelight";
+    //m_timer.reset();
+    //m_timer.stop();
     leftLeader.set(0);
     rightLeader.set(0);
+    rightLeader.setPosition(0);
+    leftLeader.setPosition(0);
+    //intakePivot.getEncoder().setPosition(0);
+    //isIntakeClosed = false;
 
     m_gyro.setAngleAdjustment(0);
     //LimelightHelpers.SetFiducialIDFiltersOverride("limelight", new int[]{0, 1, 2}); // Testing
     //LimelightHelpers.SetFiducialIDFiltersOverride("limelight", new int[]{20, 21, 22, 17, 18, 19}); // Blue Aliance
-    LimelightHelpers.SetFiducialIDFiltersOverride("limelight", new int[]{9, 10, 11, 8, 7, 6}); // Red Aliance
-    LimelightHelpers.SetFiducialIDFiltersOverride("limelight", new int[]{9, 10, 11, 8, 7, 6, 20, 21, 22, 17, 18, 19}); // Red Aliance
+    //LimelightHelpers.SetFiducialIDFiltersOverride("limelight", new int[]{9, 10, 11, 8, 7, 6}); // Red Aliance
+    //LimelightHelpers.SetFiducialIDFiltersOverride("limelight", new int[]{9, 10, 11, 8, 7, 6, 20, 21, 22, 17, 18, 19}); // Red Aliance
 
     // Set a custom crop window for improved performance (-1 to 1 for each value)
     //LimelightHelpers.setCropWindow(limelightName, -0.5, 0.5, -0.5, 0.5);
@@ -382,59 +384,45 @@ public class Robot extends TimedRobot {
   
   @Override
   public void autonomousPeriodic() {
-    //limelight logic
-    if (mtCheck && getTagID == 9) {
-      degrees1 = 44.0;
-      degrees2 = 46.0;
-      mtID1_2 = 9; // Test=1 Blue=22 Red=9
-    } else if (mtCheck && getTagID == 11) {
-      degrees1 = -44.0;
-      degrees2 = -46.0;
-      mtID1_2 = 11; // Test=2 B                                                                                                                                                                                     lue=20 Red=11
-    }
     // Check the functions below for the logic
-    if (intakePivot.getEncoder().getPosition() >= 20){
-      intakePivot.set(0);
-    } else {
+   // if (intakePivot.getEncoder().getPosition() >= 20){
+      //intakePivot.set(0);
+    /*if (intakePivot.getEncoder().getPosition() < 19 && isIntakeClosed == false) {
       intakePivot.set(0.2);
-    }
-    if (m_timer.get() >= 1.0 && m_timer.get() < 15.0) { // DRIVE FORWARD, 10 SECONDS
-      if (mtCheck && getTagID == mtID) {
-        if (m_timer.get() <= 4) {
-          adjustSpeedBasedOnDistance();
-        } else if (m_timer.get() > 4) {
-          autoPlaceCoral();
-        }
-      } else if (mtCheck && getTagID == mtID1_2) {
-        if (heading < degrees1) {
-          drive(0.1, -0.1);
-        } else if (heading > degrees2) {
-          drive(-0.1, 0.1);
-        } else {
-          //leftLeader.set(AUTO_FWD);
-          //rightLeader.set(AUTO_FWD);
-          if (m_timer.get() <= 4) {
-            adjustSpeedBasedOnDistance();
-          } else if (m_timer.get() > 4) {
-            autoPlaceCoral();
-          }
-        }
-      }else {
-        intakePivot.set(0);
+    } else {
+      isIntakeClosed = true;
+      intakePivot.set(0);
+      */if (rightLeader.getPosition().getValueAsDouble() >= -3) { // Wheel diameter: 6, 
+        rightFollower.set(-0.4);
+        leftFollower.set(-0.4);
+      } else {
         rightLeader.set(0);
         leftLeader.set(0);
-        armPitch.set(0);
       }
-       /*else if (mtCheck && getTagID == mtID1_2) {
-        if (heading < degrees1) {
-          drive(0.1, -0.1);
-        } else if (heading > degrees2) {
-          drive(-0.1, 0.1);
+        /*if(armPitch_encoder.get() < 0.9){
+          armPitch.set(-0.3);
+          armPitch2.set(0.3);
         } else {
-          //leftLeader.set(AUTO_FWD);
-          //rightLeader.set(AUTO_FWD);
-          adjustSpeedBasedOnDistance(); */
-    }  
+          armPitch.set(0);
+          armPitch2.set(0);
+          if (intakePivot.getEncoder().getPosition() >= 3){
+            intakePivot.set(-0.2);
+          } else {
+            intakePivot.set(0);
+            m_timer.start();
+            if (m_timer.get() <= 0.5) { // Wheel diameter: 6, 
+              rightLeader.set(-0.2);
+              leftLeader.set(-0.2);
+            } else {
+              rightLeader.set(0);
+              leftLeader.set(0);   
+            }
+          }
+        }
+      }
+    //} else {
+      //intakePivot.set(0.2);
+    }*/
   }
 
   private void drive(double leftSpeed, double rightSpeed) {
@@ -443,45 +431,9 @@ public class Robot extends TimedRobot {
       rightLeader.set(rightSpeed);
   }
 
-  private void adjustSpeedBasedOnDistance() {
-      /*if (mt1.rawFiducials[0].distToCamera > 1 || LimelightHelpers.getTA("limelight") < 10) {
-          drive(autoFwdSlow, autoFwdSlow);
-      } else if (mt1.rawFiducials[0].distToCamera < 0.5 || LimelightHelpers.getTA("limelight") > 13) {
-          drive(-autoFwdSlow, -autoFwdSlow);
-      }
-      if (mt1.rawFiducials[0].distToCamera == 0.4){
-          drive(autoStop, autoStop);
-          autoPlaceCoral(MULTIPLIER_SLOW);
-      }*/
-
-      if (LimelightHelpers.getTYNC("limelight") < 4.0) {
-        leftLeader.set(AUTO_FWD_SLOW);
-        rightLeader.set(AUTO_FWD_SLOW);
-      } else if (LimelightHelpers.getTYNC("limelight") > 4.5) {
-        leftLeader.set(-AUTO_FWD_SLOW);
-        rightLeader.set(-AUTO_FWD_SLOW);
-      } else {
-        leftLeader.set(AUTO_STOP);
-        rightLeader.set(AUTO_STOP);
-      }
-  }
-
-  private void rotateToTarget(double degrees1, double degrees2, double autoRot) {
-      /*
-       * Rotate to target based on the heading and the degrees of the target
-       * If the heading is less than the degrees of the target, rotate to the right
-       * If the heading is greater than the degrees of the target, rotate to the left
-       */
-      if (heading < degrees1) {
-          drive(autoRot, -autoRot);
-      } else if (heading > degrees2) {
-          drive(-autoRot, autoRot);
-      }
-  }
-
-  private void autoPlaceCoral() {
+  /*private void autoPlaceCoral() {
     m1_timer.start();
-    if (heading < 30/*Rotation till reef*/&&  m1_timer.get() <= 2) {
+    if (heading < 30&&  m1_timer.get() <= 2) {
       leftLeader.set(0.1);
       rightLeader.set(-0.1); 
       // Invert depending on scoring side
@@ -506,7 +458,7 @@ public class Robot extends TimedRobot {
       armPitch.set(0);
       armPitch2.set(0);
     }
-  }
+  }*/
 
   /*private void autoRemoveAlgae() {
     m1_timer.start();
@@ -520,7 +472,7 @@ public class Robot extends TimedRobot {
     }
   }*/
 
-  private void updateLimelightData() {
+  /*private void updateLimelightData() {
     m_poseEstimator.setVisionMeasurementStdDevs(VecBuilder.fill(.7,.7,9999999));
     //m_poseEstimator.addVisionMeasurement(
     //      mt1.pose,
@@ -540,7 +492,7 @@ public class Robot extends TimedRobot {
     mtCheck = hasTarget && mt1.tagCount == MT_AMOUNT && ta >= 0.1;
     distanceFromLimelightToGoalInches = (GOAL_HEIGHT_INCHES - LIMELIGHT_LENS_HEIGHT_INCHES) / Math.tan(angleToGoalRadians); // calculate distance
     Estimate_Distance = distanceFromLimelightToGoalInches;
- }
+ }*/
 
   @Override
   public void teleopInit() {
@@ -569,17 +521,12 @@ public class Robot extends TimedRobot {
     } else if (joystick.getL1Button()) {
       rot *= 1;
       fwd *= 1;
-    } else {
-      rot *= MULTIPLIER_NORMAL;
-      fwd *= MULTIPLIER_NORMAL;
-    }
-
-    if (joystick.getR2Button()) {
+    } else if (joystick.getR2Button()){
       rot *= 0.1;
       fwd *= 0.1;
-    } else {
-      rot *= 0.4;
-      fwd *= 0.4;
+    }else {
+      rot *= MULTIPLIER_NORMAL;
+      fwd *= MULTIPLIER_NORMAL;
     }
 
     double pitchturn = joystick1.getRawAxis(1);
@@ -615,50 +562,25 @@ public class Robot extends TimedRobot {
       rightLeader.set(20);
     }*/
 
-    if (lowerIntake.getMotorTemperature() > 60) {
-      lowerIntake.set(0);
-    } else {
-      if (joystick.getL2Button()) {
+    if (joystick.getL2Button()) {
         //if (lowerIntakTimer.get() <= 0.05){
-        lowerIntake.set(-0.35);
+        lowerIntake.set(-0.4);
       } else if (joystick.getCircleButton()){
-        lowerIntake.set(0.35);
+        lowerIntake.set(0.4);
       } else {
         lowerIntake.set(0);
       }
-    }
     
-
-
-    /*if (joystick.getCrossButtonPressed()) {
-      if (m_timer.get() > 0.0 && m_timer.get() < 10.0) { // DRIVE FORWARD, 10 SECONDS
-        if (mtCheck && mt1.rawFiducials[0].txnc != 0) {
-          if (mt1.rawFiducials[0].txnc > 0) {
-            rotateToTarget(90, 92, 90, AUTO_ROT);
-          } else if (mt1.rawFiducials[0].txnc < 0) {
-            rotateToTarget(90, 90, 92, AUTO_ROT);
-          }
-          rotateToTarget(90, degrees1, degrees2, AUTO_ROT);
-        } 
-        if (mtCheck &&  mt1.rawFiducials[0].txnc == 0) {
-            adjustSpeedBasedOnDistance(mt1, AUTO_FWD_SLOW, AUTO_STOP);
-        } else if (mtCheck && getTagID == mtID1_2) {
-            rotateToTarget(m_gyro.getAngle(), degrees1, degrees2, AUTO_ROT);
-            adjustSpeedBasedOnDistance(mt1, AUTO_FWD_SLOW, AUTO_STOP);
-        }
-      }
-      drive(AUTO_STOP, AUTO_STOP);
-    }*/
 
     /* Set output to control frames */
     leftOut.Output = fwd + rot;
     rightOut.Output = fwd - rot;
 
-    if (!intakelimitSwitch.get()) {
-      intakePivot.getEncoder().setPosition(0);
-      intakePivot.set(0);
-    } 
-
+    //if (!intakelimitSwitch.get()) {
+    //  intakePivot.getEncoder().setPosition(0);
+    //  intakePivot.set(0);
+    //} 
+    /* 
     if (intakePivot.getEncoder().getPosition() >= 18){
       if (joystick1.getPOV() <= 315 && joystick1.getPOV() >= 225){
         armRot.set(0.1);
@@ -685,67 +607,33 @@ public class Robot extends TimedRobot {
       }
     } else {
       intakePivot.set(0);
+    }*/
+
+    if (joystick.getTriangleButtonPressed()) {
+      finalAlgaeLimit = !algaeLimit;
+      algaeLimit = finalAlgaeLimit;
     }
 
-    
-
-    if (!joystick1.getRawButton(1)) {
+    if (!joystick.getRawButton(1)) {
       leftLeader.setControl(leftOut);
       rightLeader.setControl(rightOut);
       leftFollower.setControl(leftOut);
       rightFollower.setControl(rightOut);
-      //set pid values
-      /*if (turntable_encoder.get() <= 10 && turntable_encoder.get() >= -10) {*/
-      //turntable.set(rotturn);
-      /* } else {
-        turntable.set(0);
-      } */
-      if (joystick.getTriangleButton()){
-        if(armPitch_encoder.get() < 0.95){
-          armPitch.set(-0.2);
-          armPitch2.set(0.2);
-        }
-        else{
+      /*
+      if (algaeLimit = true) {  
+        if(armPitch_encoder.get() < 0.95) {
+          armPitch.set(pitchturn);
+          armPitch2.set(-pitchturn);
+        } else {
           armPitch.set(0);
           armPitch2.set(0);
         }
-      }
-      else if (joystick.getTouchpadButton()){
-        if (joystick.getTriangleButton()){
-          if(armPitch_encoder.get() > 0.80){
-            armPitch.set(-0.2);
-            armPitch2.set(0.2);
-          }
-          else{
-            armPitch.set(0);
-            armPitch2.set(0);
-          }
-        }
-      }
-      else{
+      } else if (algaeLimit = false){*/
         armPitch.set(pitchturn);
         armPitch2.set(-pitchturn);
-      }
-      
-      //turntable.set(rotturn);
+      //}
     }
   }
-
-  /*private void getAlgaeCoralConfig(boolean getAlgae, boolean getCoral) {
-    if (getAlgae == true && getCoral == false) {
-      if (intakePivot.getEncoder().getPosition() >= 17){
-        intakePivot.set(0);
-      } else {
-        intakePivot.set(0.1);
-      }
-    } else if (getAlgae == true && getCoral == false) {
-      if (intakePivot.getEncoder().getPosition() >= 12){
-        intakePivot.set(0);
-      } else {
-        intakePivot.set(0.1);
-      }
-    }
-  }*/
     
   @Override
   public void disabledInit() {
@@ -765,80 +653,19 @@ public class Robot extends TimedRobot {
 
   @Override
   public void testInit() {
-    test_timer.reset();
-    test_timer.start();
+    //test_timer.reset();
+    //test_timer.start();
     //armExt.getEncoder().setPosition(0);
-    intakePivot.getEncoder().setPosition(0);
+    //intakePivot.getEncoder().setPosition(0);
   }
 
   @Override
   public void testPeriodic() {
-    if (!intakelimitSwitch.get()) {
+    /*if (!intakelimitSwitch.get()) {
       intakePivot.getEncoder().setPosition(0);
       intakePivot.set(0);
     } else {
       intakePivot.set(-0.1);
-    }
-
-    /*if (armPitch_encoder.get() > 0.78) {
-      armPitch.set(0.1);
-      armPitch2.set(-0.1);
-    } else if (armPitch_encoder.get() < 0.8){
-      armPitch.set(-0.1);
-      armPitch2.set(0.1);
-    } else {
-      armPitch.set(0);
-      armPitch.set(0);
-    }*/
-
-    //test_timer.start();
-    /*if (test_timer.get() >= 0  &&  test_timer.get() <= 5 ){
-      if (intakePivot.getEncoder().getPosition() >= 19){
-        intakePivot.set(0);
-      } else {
-        intakePivot.set(0.1);
-      }
-    } else if (test_timer.get() > 5 &&  test_timer.get() <= 10 && armPitch_encoder.get() <= 0.95) {
-      if (armPitch_encoder.get() < 0.95) {
-        armPitch.set(-0.1);
-        armPitch2.set(0.1);
-      } else {
-        armPitch.set(0);
-        armPitch2.set(0);
-      }
-    } else if (test_timer.get() > 10 && armPitch_encoder.get() >= 0.95 &&  armPitch_encoder.get() <= 0.96) {
-      /*if (intakePivot.getEncoder().getPosition() <= 4){
-        intakePivot.set(0);
-      } else {
-        intakePivot.set(-0.1);
-      }*/
-      /*lowerIntake.set(0.1);
-     } else {
-      intakePivot.set(0);
-      armPitch.set(0);
-      armPitch2.set(0);
-    }
-
-    /*if (armExt.getEncoder().getPosition() < 3) {
-      armExt.set(0.1);
-    } else {
-      armExt.set(0);
-    }
-    
-    /*if (turntable_encoder.get() < 10) {
-      turntable.set(0.1);
-    } else {
-      turntable.set(0);
-      if (armPitch.getEncoder().getPosition() < 5) {
-        armPitch.set(0.1);
-      } else {
-        armPitch.set(0);
-        if (intakePivot.getEncoder().getPosition() > 4) {
-          intakePivot.set(-0.1);
-        } else {
-          intakePivot.set(0);
-        }
-      } 
     }*/
   }
 
@@ -877,9 +704,9 @@ public class Robot extends TimedRobot {
     return turntable_encoder.get();
   }*/
 
-  public double getPivotPosition() {
-    return intakePivot.getEncoder().getPosition();
-  }
+  //public double getPivotPosition() {
+  //  return intakePivot.getEncoder().getPosition();
+  //}
 
   public double getArmPitchPosition() {
     return armPitch_encoder.get();
@@ -893,12 +720,20 @@ public class Robot extends TimedRobot {
   public double getArmPitch2Position() {
     return armPitch2.getEncoder().getPosition();
   }
-
+  /*
   public double getArmExtPosition() {
     return armExt.getEncoder().getPosition();
+  }*/
+
+  public double getRightLeaderPosition() {
+    return rightLeader.getPosition().getValueAsDouble();
   }
 
+  public double getLeftLeaderPosition() {
+    return leftLeader.getPosition().getValueAsDouble();
+  }
+  /* 
   public void pidSetPosition(CoralPivotPositions position) {
       PIDControllerTurntable.setReference(position.getValue(), ControlType.kPosition);
-  }
-}
+  }*/
+} 
