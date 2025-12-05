@@ -2,7 +2,7 @@
 
 ## Description
 
-This is the development code used for "Bojack", the main robot of FRC team 10211
+This was the development code used for "Bojack", the main robot of FRC team 10211 in the 2025 season "REEFSCAPE"
 
 ### Features
 
@@ -12,3 +12,5 @@ This is the development code used for "Bojack", the main robot of FRC team 10211
 * SmartDashboard configuration for elastic
 
 Due to difficulties in the Orlando Regional, most of the code is commented out, limelight rangefinding feature tested.
+
+NOTE: code quality could be better, first year as a coder in frc 👌
